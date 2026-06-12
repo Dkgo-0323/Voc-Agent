@@ -94,21 +94,22 @@ Week 1 的目标是：**打通基础设施、定稿数据模型、完成数据�
 
 ## 3. SKU 列表（已锁定）
 
-| brand | model | sku_code | capacity_wh | capacity_tier | is_competitor |
-|-------|-------|----------|-------------|---------------|---------------|
-| EcoFlow | DELTA 2 | `ecoflow-delta2` | 1024 | mid | **FALSE（自家产品）** |
-| Jackery | Explorer 300 | `jackery-explorer-300` | 292 | entry | TRUE |
-| Jackery | Explorer 1000 v2 | `jackery-explorer-1000` | 1070 | mid | TRUE |
-| DJI | Power 1000 | `dji-power-1000` | 1024 | mid | TRUE |
-| Anker | SOLIX C300 | `anker-solix-c300` | 288 | entry | TRUE |
+| brand | model | sku_code | capacity_tier | 亚马逊 ASIN | 数据集匹配度 (截至2023.09) | 系统测试定位 / 演示价值 |
+|-------|-------|----------|---------------|------------|---------------------------|----------------------|
+| EcoFlow | DELTA 2 | `ecoflow-delta2` | mid (1024Wh) | B0B9XB57XM | ✅ 完美存在 (2022年上市) | 系统核心 Baseline：自家主打产品，主要用于验证 RAG 检索质量与专属特征（如快充）的提取。 |
+| Jackery | Explorer 300 | `jackery-explorer-300` | entry (292Wh) | B082TMBYR6 | ✅ 极其丰富 (2020年上市) | 便携入门档标杆：经典长寿爆款，在园艺/户外目录下评论量极大，适合用来做 tool_sql 的高并发聚合与时序趋势压测。 |
+| Jackery | Explorer 1000 (初代) | `jackery-explorer-1000` | mid (1002Wh) | B0833FBN8B | ✅ 极其丰富 (2020年上市) | 同档位正面竞品：替代时空错配的 v2。与 DELTA 2 处于同一生态位，用于演示"本周自家产品对比杰克瑞有哪些核心痛点"等多表 Join 场景。 |
+| Anker | SOLIX F2000 (767) | `anker-solix-f2000` | large (2048Wh) | B09XM7WDZ2 | ✅ 完美存在 (2022年底上市) | 大容量高端标杆：知名消费电子巨头出品。历史评论质量极高，适合用于测试系统对高级 Aspect（如智能 App 控制、双轮拉杆设计）的语义解析。 |
+| Bluetti | AC200P | `bluetti-ac200p` | large (2000Wh) | B08MZJW943 | ✅ 极其丰富 (2020年上市) | 重型家庭应急档：替代无法匹配的 AC200L。北美硬核重型电站的鼻祖，历史评论时间跨度长，为系统提供大容量、高功率维度的长周期舆情支撑。 |
 
 **`capacity_tier` 字段说明：**
 - `entry`：< 500Wh（小容量便携场景）
 - `mid`：500–1500Wh（家庭应急 + 长时户外）
+- `large`：> 1500Wh（大容量家庭应急 + 高功率场景）
 - 设计原因：`tool_sql` 做竞品对比时自动限定同档位，避免跨容量级别的无意义比较
 
 **自家产品选择理由：**
-EcoFlow DELTA 2 处于竞争最激烈的 mid 档（同档三款竞品），aspect 维度丰富（用户明确提及噪音、快充等特性），适合做 RAG 检索质量验证。
+EcoFlow DELTA 2 处于竞争最激烈的 mid 档（同档竞品 Jackery Explorer 1000），aspect 维度丰富（用户明确提及噪音、快充等特性），适合做 RAG 检索质量验证。
 
 ---
 
@@ -140,7 +141,7 @@ model             VARCHAR NOT NULL
 sku_code          VARCHAR UNIQUE NOT NULL    # slug格式，跨系统join key
 category          VARCHAR DEFAULT 'portable-power-station'
 capacity_wh       INTEGER
-capacity_tier     VARCHAR                   # 'entry' | 'mid'
+capacity_tier     VARCHAR                   # 'entry' | 'mid' | 'large'
 is_competitor     BOOLEAN NOT NULL
 created_at        TIMESTAMP WITH TIME ZONE
 ```
@@ -331,7 +332,7 @@ voc-agent/
 # 示例结构
 TARGETS = {
     "ecoflow-delta2": {
-        "amazon_asin": ["B0B5DSX24L"],
+        "amazon_asin": ["B0B9XB57XM"],
         "reddit_keywords": ["ecoflow delta 2", "delta2"],
         "reddit_subreddits": ["SolarDIY", "preppers", "vandwellers", "camping"]
     },
