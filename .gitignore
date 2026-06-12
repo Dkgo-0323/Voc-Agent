@@ -16,3 +16,8 @@ dist/
 .vscode/
 .idea/
 .DS_Store
+
+
+# Data directories
+data/
+*.jsonl
