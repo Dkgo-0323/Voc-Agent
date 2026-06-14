@@ -94,18 +94,28 @@ Week 1 的目标是：**打通基础设施、定稿数据模型、完成数据�
 
 ## 3. SKU 列表（已锁定）
 
-| brand | model | sku_code | capacity_tier | 亚马逊 ASIN | 数据集匹配度 (截至2023.09) | 系统测试定位 / 演示价值 |
-|-------|-------|----------|---------------|------------|---------------------------|----------------------|
-| EcoFlow | DELTA 2 | `ecoflow-delta2` | mid (1024Wh) | B0B9XB57XM | ✅ 完美存在 (2022年上市) | 系统核心 Baseline：自家主打产品，主要用于验证 RAG 检索质量与专属特征（如快充）的提取。 |
-| Jackery | Explorer 300 | `jackery-explorer-300` | entry (292Wh) | B082TMBYR6 | ✅ 极其丰富 (2020年上市) | 便携入门档标杆：经典长寿爆款，在园艺/户外目录下评论量极大，适合用来做 tool_sql 的高并发聚合与时序趋势压测。 |
-| Jackery | Explorer 1000 (初代) | `jackery-explorer-1000` | mid (1002Wh) | B0833FBN8B | ✅ 极其丰富 (2020年上市) | 同档位正面竞品：替代时空错配的 v2。与 DELTA 2 处于同一生态位，用于演示"本周自家产品对比杰克瑞有哪些核心痛点"等多表 Join 场景。 |
-| Anker | SOLIX F2000 (767) | `anker-solix-f2000` | large (2048Wh) | B09XM7WDZ2 | ✅ 完美存在 (2022年底上市) | 大容量高端标杆：知名消费电子巨头出品。历史评论质量极高，适合用于测试系统对高级 Aspect（如智能 App 控制、双轮拉杆设计）的语义解析。 |
-| Bluetti | AC200P | `bluetti-ac200p` | large (2000Wh) | B08MZJW943 | ✅ 极其丰富 (2020年上市) | 重型家庭应急档：替代无法匹配的 AC200L。北美硬核重型电站的鼻祖，历史评论时间跨度长，为系统提供大容量、高功率维度的长周期舆情支撑。 |
+| brand | model | sku_code | capacity_tier | 容量(Wh) | 亚马逊 Parent ASIN | 数据集评论数 | is_competitor | 系统测试定位 / 演示价值 |
+|-------|-------|----------|---------------|---------|-------------------|------------|--------------|----------------------|
+| EcoFlow | DELTA 2 | `ecoflow-delta2` | mid | 1024 | B0BNL7R3L1 | 229 | FALSE | 系统核心 Baseline：自家主打产品，主要用于验证 RAG 检索质量与专属特征（如快充）的提取。 |
+| Jackery | Explorer 1000 | `jackery-explorer-1000` | mid | 1002 | B0BMQ9FGFS | 1714 | TRUE | 同档位正面竞品：与 DELTA 2 处于同一生态位，评论量极大，用于演示"本周自家产品对比杰克瑞有哪些核心痛点"等多表 Join 场景，以及 tool_sql 高并发聚合与时序趋势压测。 |
+| Jackery | Explorer 240 | `jackery-explorer-240` | entry | 240 | B09YM1BXKP | 3653 | TRUE | 入门档数据之王：数据集内评论量最大的 SKU，适合做 tool_sql 的全量聚合压测与长周期时序分析。同时也用于验证 entry 档 vs mid 档的跨容量对比抑制逻辑。 |
+| Jackery | Explorer 300 | `jackery-explorer-300` | entry | 293 | B0C7W65JP8 | 32 | TRUE | 便携入门档补充：评论量少，用于测试系统在低数据量 SKU 上的降级表现和零结果提示策略。 |
+| Anker | SOLIX F2000 (767) | `anker-solix-f2000` | large | 2048 | B0BP2DT79S | 34 | TRUE | 大容量高端标杆：知名消费电子巨头出品，评论质量极高，适合用于测试系统对高级 Aspect（如智能 App 控制、双轮拉杆设计）的语义解析。 |
+
+**SKU 选定调整说明：**
+- `jackery-explorer-1000`：ASIN 从旧版 `B0833FBN8B`（0条评论）切换至 parent ASIN `B0BMQ9FGFS`（1714条），解决数据集匹配问题
+- `bluetti-ac200p`：**彻底放弃**，数据集中无可用数据，且无其他 large 档替补
+- `jackery-explorer-240`：**新增**，3653条评论为全数据集最大量，填补第5个 SKU 槽位
+- `ecoflow-delta2`：ASIN 从 `B0B9XB57XM` 切换至 parent ASIN `B0BNL7R3L1`（229条）
+- `anker-solix-f2000`：ASIN 从 `B09XM7WDZ2` 切换至 parent ASIN `B0BP2DT79S`（34条）
+- `jackery-explorer-300`：ASIN 从 `B082TMBYR6` 切换至 parent ASIN `B0C7W65JP8`（32条）
+- **总评论数：~5,662 条**，完全满足 Week 1 验收需求
+- 所有 ASIN 统一使用 **parent ASIN**，因为 McAuley 数据集中评论关联的是 parent 而非子变体
 
 **`capacity_tier` 字段说明：**
-- `entry`：< 500Wh（小容量便携场景）
-- `mid`：500–1500Wh（家庭应急 + 长时户外）
-- `large`：> 1500Wh（大容量家庭应急 + 高功率场景）
+- `entry`：< 500Wh（小容量便携场景）— 本列表含 Explorer 240 (240Wh) 和 Explorer 300 (293Wh)
+- `mid`：500–1500Wh（家庭应急 + 长时户外）— 本列表含 DELTA 2 (1024Wh) 和 Explorer 1000 (1002Wh)
+- `large`：> 1500Wh（大容量家庭应急 + 高功率场景）— 本列表含 SOLIX F2000 (2048Wh)
 - 设计原因：`tool_sql` 做竞品对比时自动限定同档位，避免跨容量级别的无意义比较
 
 **自家产品选择理由：**
@@ -329,14 +339,32 @@ voc-agent/
 
 **`targets.py` 需定义的映射：**
 ```python
-# 示例结构
 TARGETS = {
     "ecoflow-delta2": {
-        "amazon_asin": ["B0B9XB57XM"],
+        "amazon_asin": ["B0BNL7R3L1"],           # parent ASIN, 229条
         "reddit_keywords": ["ecoflow delta 2", "delta2"],
         "reddit_subreddits": ["SolarDIY", "preppers", "vandwellers", "camping"]
     },
-    # ... 其余4个SKU
+    "jackery-explorer-1000": {
+        "amazon_asin": ["B0BMQ9FGFS"],           # parent ASIN, 1714条
+        "reddit_keywords": ["jackery 1000", "jackery explorer 1000"],
+        "reddit_subreddits": ["SolarDIY", "preppers", "vandwellers", "camping"]
+    },
+    "jackery-explorer-240": {
+        "amazon_asin": ["B09YM1BXKP"],           # parent ASIN, 3653条
+        "reddit_keywords": ["jackery 240", "jackery explorer 240"],
+        "reddit_subreddits": ["SolarDIY", "preppers", "vandwellers", "camping"]
+    },
+    "jackery-explorer-300": {
+        "amazon_asin": ["B0C7W65JP8"],           # parent ASIN, 32条
+        "reddit_keywords": ["jackery 300", "jackery explorer 300"],
+        "reddit_subreddits": ["SolarDIY", "preppers", "vandwellers", "camping"]
+    },
+    "anker-solix-f2000": {
+        "amazon_asin": ["B0BP2DT79S"],           # parent ASIN, 34条
+        "reddit_keywords": ["anker solix f2000", "anker 767", "anker power station"],
+        "reddit_subreddits": ["SolarDIY", "preppers", "vandwellers", "camping"]
+    },
 }
 ```
 
@@ -390,4 +418,4 @@ Week 1 结束后，Week 2 接手时需要：
 
 ---
 
-*文档版本：v1.0 | 对应开发阶段：Week 1 | 所有决策已锁定*
+*文档版本：v1.1 | 对应开发阶段：Week 1 | 所有决策已锁定 | SKU 列表已按数据集实勘结果最终定稿*
