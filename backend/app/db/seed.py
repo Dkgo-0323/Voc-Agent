@@ -1,110 +1,81 @@
-"""
-SKU 初始数据写入脚本
-运行方式：python -m backend.app.db.seed
-"""
-
 import asyncio
-import uuid
+from sqlalchemy import text
 
-from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession
+from backend.app.core.database import init_db, close_db, get_db_context
 
-# 修改点 1：导入 init_db 和 get_db_context
-from backend.app.core.database import init_db, get_db_context
-from backend.app.db.models import Sku
-
-# ──────────────────────────────────────────────
-# 已锁定 SKU 数据（对应文档 Section 3）
-# ──────────────────────────────────────────────
 SKU_DATA = [
     {
-        "brand": "EcoFlow",
-        "model": "DELTA 2",
-        "sku_code": "ecoflow-delta2",
-        "capacity_wh": 1024,
+        "brand":         "EcoFlow",
+        "model":         "DELTA 2",
+        "sku_code":      "ecoflow-delta2",
+        "capacity_wh":   1024,
         "capacity_tier": "mid",
-        "is_competitor": False,  # 自家产品
+        "is_competitor": False,
     },
     {
-        "brand": "Jackery",
-        "model": "Explorer 300",
-        "sku_code": "jackery-explorer-300",
-        "capacity_wh": 292,
+        "brand":         "Jackery",
+        "model":         "Explorer 1000",
+        "sku_code":      "jackery-explorer-1000",
+        "capacity_wh":   1002,
+        "capacity_tier": "mid",
+        "is_competitor": True,
+    },
+    {
+        "brand":         "Jackery",
+        "model":         "Explorer 300",
+        "sku_code":      "jackery-explorer-300",
+        "capacity_wh":   293,
         "capacity_tier": "entry",
         "is_competitor": True,
     },
     {
-        "brand": "Jackery",
-        "model": "Explorer 1000 v2",
-        "sku_code": "jackery-explorer-1000",
-        "capacity_wh": 1070,
-        "capacity_tier": "mid",
-        "is_competitor": True,
-    },
-    {
-        "brand": "DJI",
-        "model": "Power 1000",
-        "sku_code": "dji-power-1000",
-        "capacity_wh": 1024,
-        "capacity_tier": "mid",
-        "is_competitor": True,
-    },
-    {
-        "brand": "Anker",
-        "model": "SOLIX C300",
-        "sku_code": "anker-solix-c300",
-        "capacity_wh": 288,
+        "brand":         "Jackery",
+        "model":         "Explorer 240",
+        "sku_code":      "jackery-explorer-240",
+        "capacity_wh":   240,
         "capacity_tier": "entry",
+        "is_competitor": True,
+    },
+    {
+        "brand":         "Anker",
+        "model":         "SOLIX F2000",
+        "sku_code":      "anker-solix-f2000",
+        "capacity_wh":   2048,
+        "capacity_tier": "large",
         "is_competitor": True,
     },
 ]
 
 
-async def seed_skus(session: AsyncSession) -> None:
-    """写入 SKU 数据，已存在则跳过（幂等）"""
-    inserted = 0
-    skipped = 0
-
-    for data in SKU_DATA:
-        # 检查是否已存在
-        result = await session.execute(
-            select(Sku).where(Sku.sku_code == data["sku_code"])
-        )
-        existing = result.scalar_one_or_none()
-
-        if existing:
-            print(f"  SKIP  {data['sku_code']} (already exists)")
-            skipped += 1
-            continue
-
-        sku = Sku(
-            id=uuid.uuid4(),
-            brand=data["brand"],
-            model=data["model"],
-            sku_code=data["sku_code"],
-            category="portable-power-station",
-            capacity_wh=data["capacity_wh"],
-            capacity_tier=data["capacity_tier"],
-            is_competitor=data["is_competitor"],
-        )
-        session.add(sku)
-        print(f"  INSERT {data['sku_code']}")
-        inserted += 1
-
-    await session.commit()
-    print(f"\n✅ Seed complete: {inserted} inserted, {skipped} skipped")
-
-
-async def main() -> None:
-    print("🌱 Seeding SKU data...\n")
-    
-    # 修改点 2：在非 FastAPI 环境下启动脚本，必须先手动建立数据库连接池
+async def seed():
     await init_db()
-    
-    # 修改点 3：替换为 get_db_context() 上下文管理器
-    async with get_db_context() as session:
-        await seed_skus(session)
+    try:
+        async with get_db_context() as session:
+            for sku in SKU_DATA:
+                await session.execute(
+                    text("""
+                        INSERT INTO skus (
+                            id, brand, model, sku_code, category,
+                            capacity_wh, capacity_tier, is_competitor, created_at
+                        ) VALUES (
+                            gen_random_uuid(), :brand, :model, :sku_code,
+                            'portable-power-station',
+                            :capacity_wh, :capacity_tier, :is_competitor,
+                            NOW()
+                        )
+                        ON CONFLICT (sku_code) DO UPDATE SET
+                            brand         = EXCLUDED.brand,
+                            model         = EXCLUDED.model,
+                            capacity_wh   = EXCLUDED.capacity_wh,
+                            capacity_tier = EXCLUDED.capacity_tier,
+                            is_competitor = EXCLUDED.is_competitor
+                    """),
+                    sku,
+                )
+        print(f"✅ Seed 完成，写入 {len(SKU_DATA)} 条 SKU")
+    finally:
+        await close_db()
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    asyncio.run(seed())
