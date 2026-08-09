@@ -5,7 +5,7 @@ from uuid import UUID
 from sqlalchemy import select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.db.models import Document, utcnow
+from backend.app.db.models import Document, Sku, utcnow
 from backend.app.db.repositories.schemas import DocumentRead
 
 
@@ -18,21 +18,29 @@ class DocumentRepository:
     async def fetch_unprocessed(self, limit: int) -> list[DocumentRead]:
         if limit <= 0:
             return []
-        result = await self._session.scalars(
-            select(Document)
+        result = await self._session.execute(
+            select(Document, Sku.sku_code)
+            .join(Sku, Document.sku_id == Sku.id)
             .where(Document.processing_status == "raw")
             .order_by(Document.ingested_at.asc())
             .limit(limit)
         )
-        return [DocumentRead.model_validate(document) for document in result]
+        return [
+            DocumentRead.model_validate({**document.__dict__, "sku_code": sku_code})
+            for document, sku_code in result
+        ]
 
     async def fetch_by_status(self, status: str) -> list[DocumentRead]:
-        result = await self._session.scalars(
-            select(Document)
+        result = await self._session.execute(
+            select(Document, Sku.sku_code)
+            .join(Sku, Document.sku_id == Sku.id)
             .where(Document.processing_status == status)
             .order_by(Document.ingested_at.asc())
         )
-        return [DocumentRead.model_validate(document) for document in result]
+        return [
+            DocumentRead.model_validate({**document.__dict__, "sku_code": sku_code})
+            for document, sku_code in result
+        ]
 
     async def update_status(
         self, doc_id: UUID, status: str, error: str | None = None

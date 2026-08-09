@@ -15,6 +15,7 @@ class DocumentRead(BaseModel):
 
     id: UUID
     sku_id: UUID
+    sku_code: str
     platform: str
     external_id: str
     title: str | None
