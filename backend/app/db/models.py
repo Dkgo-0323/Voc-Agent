@@ -4,13 +4,13 @@
 """
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import (
-    BigInteger,
     Boolean,
     Float,
     ForeignKey,
+    Index,
     Integer,
     SmallInteger,
     Text,
@@ -22,7 +22,7 @@ from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
 
 def utcnow() -> datetime:
-    return datetime.now(timezone.utc).replace(tzinfo=None)
+    return datetime.now(UTC).replace(tzinfo=None)
 
 
 class Base(DeclarativeBase):
@@ -83,6 +83,11 @@ class Document(Base):
     ingested_at: Mapped[datetime] = mapped_column(
         default=utcnow, server_default=func.now()
     )
+    processing_status: Mapped[str] = mapped_column(
+        Text, nullable=False, default="raw", server_default="raw", index=True
+    )
+    processing_error: Mapped[str | None] = mapped_column(Text)
+    processed_at: Mapped[datetime | None] = mapped_column()
 
     # relationships
     sku: Mapped["Sku"] = relationship(back_populates="documents")
@@ -96,6 +101,12 @@ class Document(Base):
 # ──────────────────────────────────────────────
 class AspectMention(Base):
     __tablename__ = "aspect_mentions"
+    __table_args__ = (
+        Index("ix_aspect_mentions_sku_code", "sku_code"),
+        Index("ix_aspect_mentions_aspect_label", "aspect_label"),
+        Index("ix_aspect_mentions_week_id", "week_id"),
+        Index("ix_aspect_mentions_quality_score", "quality_score"),
+    )
 
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), primary_key=True, default=uuid.uuid4
@@ -103,12 +114,15 @@ class AspectMention(Base):
     document_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("documents.id"), nullable=False
     )
+    sku_code: Mapped[str] = mapped_column(Text, nullable=False)
     aspect_label: Mapped[str] = mapped_column(Text, nullable=False)
     sentiment: Mapped[str] = mapped_column(Text, nullable=False)
     sentiment_score: Mapped[float | None] = mapped_column(Float)
+    confidence: Mapped[float | None] = mapped_column(Float)
     mention_text: Mapped[str] = mapped_column(Text, nullable=False)
     context_window: Mapped[str | None] = mapped_column(Text)
     quality_score: Mapped[float | None] = mapped_column(Float)
+    embed_text: Mapped[str | None] = mapped_column(Text)
     week_id: Mapped[int] = mapped_column(Integer, nullable=False)
     created_at: Mapped[datetime] = mapped_column(
         default=utcnow, server_default=func.now()
