@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     # ── Milvus ───────────────────────────────────────────────
     milvus_host: str = "localhost"
     milvus_port: int = 19530
+    milvus_collection_name: str = "aspect_mentions_vectors"
 
     # ── Reddit API ───────────────────────────────────────────
     reddit_client_id: str = ""
@@ -45,6 +46,13 @@ class Settings(BaseSettings):
 
     # ── OpenAI ───────────────────────────────────────────────
     openai_api_key: str = ""
+
+    # ── Embedding（支持 OpenAI-compatible 国内服务）──────────
+    embedding_api_key: str = ""
+    embedding_base_url: str = "https://api.openai.com/v1"
+    embedding_model: str = "text-embedding-3-small"
+    embedding_dimensions: int = Field(default=1536, gt=0)
+    embedding_batch_size: int = Field(default=100, ge=1, le=100)
 
     # ── JWT ──────────────────────────────────────────────────
     jwt_secret_key: str = Field(

@@ -21,7 +21,12 @@ dependencies = [
     "pydantic-settings>=2.2.1",
     "python-dotenv>=1.0.1",
     # ── 向量数据库 ───────────────────────────────────────────
-    "pymilvus>=2.3.6",
+    # Keep the client protocol-compatible with docker-compose Milvus v2.3.4.
+    "pymilvus>=2.3.6,<2.4.0",
+    # PyMilvus 2.3 imports the legacy pkg_resources module at runtime.
+    "setuptools<81",
+    # PyMilvus 2.3's environs integration requires Marshmallow 3.x.
+    "marshmallow>=3.13,<4",
     # ── 数据抓取 ─────────────────────────────────────────────
     "praw>=7.7.1",               # Reddit API
     # ── PII 脱敏 ─────────────────────────────────────────────
