@@ -7,12 +7,9 @@ from typing import Any, Protocol
 from openai import AsyncOpenAI
 
 from backend.app.core.settings import settings
-from pipelines.config.targets import TARGETS
 
-EMBEDDING_MODEL = settings.embedding_model
-EMBEDDING_DIMENSION = settings.embedding_dimensions
-EMBEDDING_BATCH_SIZE = settings.embedding_batch_size
 MAX_EMBEDDING_BATCH_SIZE = 100
+DIMENSION_PROBE_TEXT = "portable power station embedding dimension check"
 
 
 class EmbeddingsClient(Protocol):
@@ -23,18 +20,10 @@ class EmbeddingsClient(Protocol):
 class EmbeddingInput:
     """The PostgreSQL fields required to build one canonical embedding text."""
 
-    sku_code: str
+    sku_name: str
     aspect_label: str
     mention_text: str
     context_window: str | None = None
-
-
-def sku_name(sku_code: str) -> str:
-    """Resolve a locked SKU slug to its customer-facing product name."""
-    target = TARGETS.get(sku_code)
-    if target is None:
-        raise ValueError(f"Unknown sku_code: {sku_code}")
-    return f"{target['brand']} {target['model']}"
 
 
 def build_embed_text(item: EmbeddingInput) -> str:
@@ -42,7 +31,10 @@ def build_embed_text(item: EmbeddingInput) -> str:
     mention = item.mention_text.strip()
     if not mention:
         raise ValueError("mention_text must not be empty")
-    text = f"[{sku_name(item.sku_code)}] [{item.aspect_label}]: {mention}"
+    product_name = item.sku_name.strip()
+    if not product_name:
+        raise ValueError("sku_name must not be empty")
+    text = f"[{product_name}] [{item.aspect_label}]: {mention}"
     if item.context_window and (context := item.context_window.strip()):
         text += f". Context: {context[:200]}"
     return text
@@ -59,8 +51,10 @@ class Embedder:
         batch_size: int | None = None,
     ) -> None:
         model = model or settings.embedding_model
-        dimensions = dimensions or settings.embedding_dimensions
+        dimensions = settings.embedding_dimensions if dimensions is None else dimensions
         batch_size = batch_size or settings.embedding_batch_size
+        if dimensions <= 0:
+            raise ValueError("EMBEDDING_DIMENSIONS must be positive")
         if batch_size < 1 or batch_size > MAX_EMBEDDING_BATCH_SIZE:
             raise ValueError(
                 f"batch_size must be between 1 and {MAX_EMBEDDING_BATCH_SIZE}"
@@ -92,10 +86,25 @@ class Embedder:
             if len(ordered) != len(batch):
                 raise RuntimeError("Embedding API returned an incomplete batch")
             batch_vectors = [list(item.embedding) for item in ordered]
-            if any(len(vector) != self._dimensions for vector in batch_vectors):
-                raise RuntimeError("Embedding API returned an unexpected vector dimension")
+            invalid_dimensions = {
+                len(vector)
+                for vector in batch_vectors
+                if len(vector) != self._dimensions
+            }
+            if invalid_dimensions:
+                raise RuntimeError(
+                    "Embedding API dimension mismatch: "
+                    f"EMBEDDING_DIMENSIONS={self._dimensions}, "
+                    f"model={self._model}, returned={sorted(invalid_dimensions)}"
+                )
             vectors.extend(batch_vectors)
         return vectors
+
+    async def validate_dimension_contract(self) -> None:
+        """Probe the configured provider before the application accepts traffic."""
+        vectors = await self.embed([DIMENSION_PROBE_TEXT])
+        if len(vectors) != 1:
+            raise RuntimeError("Embedding API dimension probe returned no vector")
 
     async def embed_inputs(
         self, items: Sequence[EmbeddingInput]

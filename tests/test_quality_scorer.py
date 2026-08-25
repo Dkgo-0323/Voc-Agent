@@ -35,3 +35,18 @@ def test_high_rating_reduces_confidence_for_negative_mention() -> None:
         rating=4,
     )
     assert result.confidence == 0.63
+
+
+def test_high_llm_confidence_cannot_rescue_generic_praise() -> None:
+    result = score_quality(
+        mention_text="So far so good",
+        context_window="So far so good after three weeks.",
+        aspect_label="customer_service",
+        sentiment="positive",
+        confidence=1.0,
+        platform="amazon",
+        rating=5,
+    )
+
+    assert result.specificity == 0
+    assert result.score <= 0.35

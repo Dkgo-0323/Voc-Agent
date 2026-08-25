@@ -19,11 +19,18 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     op.add_column(
         "documents",
-        sa.Column("processing_status", sa.String(length=20), nullable=False, server_default="raw"),
+        sa.Column(
+            "processing_status",
+            sa.String(length=20),
+            nullable=False,
+            server_default="raw",
+        ),
     )
     op.add_column("documents", sa.Column("processing_error", sa.Text(), nullable=True))
     op.add_column("documents", sa.Column("processed_at", sa.DateTime(), nullable=True))
-    op.create_index("ix_documents_processing_status", "documents", ["processing_status"])
+    op.create_index(
+        "ix_documents_processing_status", "documents", ["processing_status"]
+    )
 
     op.add_column("aspect_mentions", sa.Column("sku_code", sa.Text(), nullable=True))
     op.add_column("aspect_mentions", sa.Column("confidence", sa.Float(), nullable=True))
@@ -39,9 +46,13 @@ def upgrade() -> None:
     )
     op.alter_column("aspect_mentions", "sku_code", nullable=False)
     op.create_index("ix_aspect_mentions_sku_code", "aspect_mentions", ["sku_code"])
-    op.create_index("ix_aspect_mentions_aspect_label", "aspect_mentions", ["aspect_label"])
+    op.create_index(
+        "ix_aspect_mentions_aspect_label", "aspect_mentions", ["aspect_label"]
+    )
     op.create_index("ix_aspect_mentions_week_id", "aspect_mentions", ["week_id"])
-    op.create_index("ix_aspect_mentions_quality_score", "aspect_mentions", ["quality_score"])
+    op.create_index(
+        "ix_aspect_mentions_quality_score", "aspect_mentions", ["quality_score"]
+    )
 
 
 def downgrade() -> None:

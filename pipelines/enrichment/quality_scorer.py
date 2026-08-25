@@ -15,9 +15,31 @@ CORE_PERFORMANCE_ASPECTS = {
     "ac_output_power",
     "output_ports",
 }
-GENERIC_TERMS = {"great", "good", "bad", "awesome", "excellent", "terrible", "love", "hate"}
-COMPARISON_PATTERN = re.compile(r"\b(better|worse|than|faster|slower|more|less)\b", re.I)
-NUMBER_PATTERN = re.compile(r"\b\d+(?:\.\d+)?\s*(?:w|wh|hours?|hrs?|minutes?|mins?|%)?\b", re.I)
+GENERIC_TERMS = {
+    "great",
+    "good",
+    "bad",
+    "awesome",
+    "excellent",
+    "terrible",
+    "love",
+    "hate",
+}
+GENERIC_PHRASE_PATTERN = re.compile(
+    r"^(?:(?:a\s+)?(?:great|good|awesome|excellent|nice)(?:\s+product)?|"
+    r"(?:i\s+)?love\s+it|so\s+far[, ]+so\s+good|"
+    r"(?:i(?:'m| am)\s+)?happy\s+with\s+(?:it|the\s+purchase)|"
+    r"(?:it\s+)?works?\s+(?:very\s+)?well|"
+    r"(?:i(?:'ve| have)?\s+)?used\s+(?:it\s+)?(?:a\s+)?few\s+times|"
+    r"(?:this|it)\s+feels\s+like\s+a\s+quality\s+unit)$",
+    re.I,
+)
+COMPARISON_PATTERN = re.compile(
+    r"\b(better|worse|than|faster|slower|more|less)\b", re.I
+)
+NUMBER_PATTERN = re.compile(
+    r"\b\d+(?:\.\d+)?\s*(?:w|wh|hours?|hrs?|minutes?|mins?|%)?\b", re.I
+)
 
 
 @dataclass(frozen=True)
@@ -32,6 +54,8 @@ class QualityScore:
 def specificity_score(mention_text: str, aspect_label: str) -> float:
     text = mention_text.strip()
     normalized = text.lower().strip(".!? ,")
+    if GENERIC_PHRASE_PATTERN.fullmatch(normalized):
+        return 0.0
     score = 0.0
     if NUMBER_PATTERN.search(text):
         score += 0.3
@@ -95,8 +119,8 @@ def score_quality(
         + W_LENGTH * length
         + W_SOURCE * source
     )
-    if platform.lower() == "amazon" and rating is not None and rating >= 4 and sentiment == "positive":
-        score *= 1.1
+    if GENERIC_PHRASE_PATTERN.fullmatch(mention_text.lower().strip(".!? ,")):
+        score = min(score, 0.35)
     return QualityScore(
         score=round(min(score, 1.0), 4),
         specificity=specificity,

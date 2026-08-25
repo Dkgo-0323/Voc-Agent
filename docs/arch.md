@@ -62,6 +62,7 @@ The Agent operates on a handwritten multi-turn loop. It streams output to the fr
 ### Database Choices
 - **RDBMS**: PostgreSQL 15. Managed by Alembic (`env.py` configured with `run_async_migrations`).
 - **Vector DB**: Milvus 2.x (Docker). Uses Hybrid Search (Vector + Scalar Metadata filtering).
+- **Embedding Contract**: Zhipu `embedding-3` via `https://open.bigmodel.cn/api/paas/v4/`; dimension is sourced only from `EMBEDDING_DIMENSIONS` (currently 1024) and must match both API output and the Milvus vector field.
 
 ### Cross-System Joining & Mapping
 - **Milvus Granularity**: Sentence/Aspect level.
@@ -92,7 +93,7 @@ The Agent operates on a handwritten multi-turn loop. It streams output to the fr
         A[Ingest: Reddit/Amazon] --> B[Sanitize: Presidio PII]
         B --> C[Enrich: Aspect/Sentiment]
         C --> D{Storage Router}
-        D -->|Dim=1536 Embeddings| E[(Milvus Vector DB)]
+        D -->|embedding-3 / Dim=1024| E[(Milvus Vector DB)]
         D -->|Sync UUID| F[(PostgreSQL)]
       end
 

@@ -16,9 +16,7 @@ from pymilvus import (
 
 from backend.app.core.settings import settings
 from pipelines.config.targets import TARGETS
-from pipelines.embedding.embedder import EMBEDDING_DIMENSION
 
-COLLECTION_NAME = "aspect_mentions_vectors"
 UPSERT_BATCH_SIZE = 500
 INDEX_CONFIGS: dict[str, dict[str, Any]] = {
     "vector": {
@@ -73,11 +71,17 @@ class MilvusRepository:
         port: int = settings.milvus_port,
         collection_name: str = settings.milvus_collection_name,
         collection_factory: Callable[..., Any] = Collection,
+        dimension: int | None = None,
     ) -> None:
         self._host = host
         self._port = port
         self.collection_name = collection_name
         self._collection_factory = collection_factory
+        self._dimension = (
+            settings.embedding_dimensions if dimension is None else dimension
+        )
+        if self._dimension <= 0:
+            raise ValueError("EMBEDDING_DIMENSIONS must be positive")
 
     def connect(self) -> None:
         connections.connect(alias="default", host=self._host, port=str(self._port))
@@ -90,7 +94,7 @@ class MilvusRepository:
         else:
             fields = [
                 FieldSchema("id", DataType.VARCHAR, is_primary=True, max_length=36),
-                FieldSchema("vector", DataType.FLOAT_VECTOR, dim=EMBEDDING_DIMENSION),
+                FieldSchema("vector", DataType.FLOAT_VECTOR, dim=self._dimension),
                 FieldSchema("sku_code", DataType.VARCHAR, max_length=50),
                 FieldSchema("aspect_label", DataType.VARCHAR, max_length=50),
                 FieldSchema("sentiment", DataType.VARCHAR, max_length=20),
@@ -101,6 +105,7 @@ class MilvusRepository:
                 self.collection_name,
                 schema=CollectionSchema(fields, description="Aspect mention vectors"),
             )
+        self._validate_collection_dimension(collection)
         self._ensure_indexes(collection)
         existing = {partition.name for partition in collection.partitions}
         for sku_code in TARGETS:
@@ -108,6 +113,25 @@ class MilvusRepository:
             if partition_name not in existing:
                 collection.create_partition(partition_name)
         return collection
+
+    def _validate_collection_dimension(self, collection: Any) -> None:
+        vector_field = next(
+            (field for field in collection.schema.fields if field.name == "vector"),
+            None,
+        )
+        if vector_field is None:
+            raise RuntimeError(
+                f"Milvus collection '{self.collection_name}' has no vector field"
+            )
+        actual_dimension = int(vector_field.params.get("dim", 0))
+        if actual_dimension != self._dimension:
+            raise RuntimeError(
+                "Milvus vector dimension mismatch: "
+                f"collection='{self.collection_name}', "
+                f"EMBEDDING_DIMENSIONS={self._dimension}, "
+                f"collection_dimension={actual_dimension}. Refusing to write; "
+                "use a compatible collection instead."
+            )
 
     @staticmethod
     def _ensure_indexes(collection: Any) -> None:
@@ -156,21 +180,30 @@ class MilvusRepository:
         aspect_label: str | None = None,
         sentiment: str | None = None,
         week_id_range: tuple[int, int] | None = None,
-        quality_threshold: float = 0.5,
+        quality_threshold: float | None = None,
         top_k: int = 20,
     ) -> list[SearchResult]:
-        if len(query_vector) != EMBEDDING_DIMENSION:
-            raise ValueError(f"query_vector must have {EMBEDDING_DIMENSION} dimensions")
-        if not 0 <= quality_threshold <= 1:
+        if len(query_vector) != self._dimension:
+            raise ValueError(f"query_vector must have {self._dimension} dimensions")
+        effective_threshold = (
+            settings.aspect_quality_threshold
+            if quality_threshold is None
+            else quality_threshold
+        )
+        if not 0 <= effective_threshold <= 1:
             raise ValueError("quality_threshold must be between 0 and 1")
         if top_k < 1:
             raise ValueError("top_k must be positive")
-        if sentiment is not None and sentiment not in {"positive", "negative", "neutral"}:
+        if sentiment is not None and sentiment not in {
+            "positive",
+            "negative",
+            "neutral",
+        }:
             raise ValueError("Unsupported sentiment")
         if week_id_range is not None and week_id_range[0] > week_id_range[1]:
             raise ValueError("week_id_range start must not exceed end")
 
-        expressions = [f"quality_score >= {quality_threshold}"]
+        expressions = [f"quality_score >= {effective_threshold}"]
         if sku_code:
             expressions.append(f"sku_code == {_quote(sku_code)}")
         if aspect_label:
@@ -189,14 +222,29 @@ class MilvusRepository:
             param={"metric_type": "COSINE", "params": {"ef": max(64, top_k)}},
             limit=top_k,
             expr=" and ".join(expressions),
-            output_fields=["sku_code", "aspect_label", "sentiment", "week_id", "quality_score"],
+            output_fields=[
+                "sku_code",
+                "aspect_label",
+                "sentiment",
+                "week_id",
+                "quality_score",
+            ],
             partition_names=[_partition_name(sku_code)] if sku_code else None,
         )
         return [
             SearchResult(
                 id=UUID(str(hit.id)),
                 score=float(hit.score),
-                metadata={field: hit.entity.get(field) for field in ("sku_code", "aspect_label", "sentiment", "week_id", "quality_score")},
+                metadata={
+                    field: hit.entity.get(field)
+                    for field in (
+                        "sku_code",
+                        "aspect_label",
+                        "sentiment",
+                        "week_id",
+                        "quality_score",
+                    )
+                },
             )
             for hit in results[0]
         ]
@@ -211,12 +259,11 @@ class MilvusRepository:
         )
         collection.flush()
 
-    @staticmethod
-    def _validate_record(record: MilvusRecord) -> None:
+    def _validate_record(self, record: MilvusRecord) -> None:
         if record.sku_code not in TARGETS:
             raise ValueError(f"Unknown sku_code: {record.sku_code}")
-        if len(record.vector) != EMBEDDING_DIMENSION:
-            raise ValueError(f"vector must have {EMBEDDING_DIMENSION} dimensions")
+        if len(record.vector) != self._dimension:
+            raise ValueError(f"vector must have {self._dimension} dimensions")
         if record.sentiment not in {"positive", "negative", "neutral"}:
             raise ValueError("Unsupported sentiment")
         if not 0 <= record.quality_score <= 1:
