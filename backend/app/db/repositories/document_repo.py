@@ -15,31 +15,51 @@ class DocumentRepository:
     def __init__(self, session: AsyncSession) -> None:
         self._session = session
 
-    async def fetch_unprocessed(self, limit: int) -> list[DocumentRead]:
+    async def fetch_unprocessed(
+        self, limit: int, *, include_disabled: bool = False
+    ) -> list[DocumentRead]:
         if limit <= 0:
             return []
-        result = await self._session.execute(
+        statement = (
             select(Document, Sku.sku_code)
             .join(Sku, Document.sku_id == Sku.id)
             .where(Document.processing_status == "raw")
             .order_by(Document.ingested_at.asc())
             .limit(limit)
         )
+        if not include_disabled:
+            statement = statement.where(Sku.dashboard_enabled.is_(True))
+        statement = statement.add_columns(
+            (Sku.brand + " " + Sku.model).label("sku_name")
+        )
+        result = await self._session.execute(statement)
         return [
-            DocumentRead.model_validate({**document.__dict__, "sku_code": sku_code})
-            for document, sku_code in result
+            DocumentRead.model_validate(
+                {**document.__dict__, "sku_code": sku_code, "sku_name": sku_name}
+            )
+            for document, sku_code, sku_name in result
         ]
 
-    async def fetch_by_status(self, status: str) -> list[DocumentRead]:
-        result = await self._session.execute(
+    async def fetch_by_status(
+        self, status: str, *, include_disabled: bool = False
+    ) -> list[DocumentRead]:
+        statement = (
             select(Document, Sku.sku_code)
             .join(Sku, Document.sku_id == Sku.id)
             .where(Document.processing_status == status)
             .order_by(Document.ingested_at.asc())
         )
+        if not include_disabled:
+            statement = statement.where(Sku.dashboard_enabled.is_(True))
+        statement = statement.add_columns(
+            (Sku.brand + " " + Sku.model).label("sku_name")
+        )
+        result = await self._session.execute(statement)
         return [
-            DocumentRead.model_validate({**document.__dict__, "sku_code": sku_code})
-            for document, sku_code in result
+            DocumentRead.model_validate(
+                {**document.__dict__, "sku_code": sku_code, "sku_name": sku_name}
+            )
+            for document, sku_code, sku_name in result
         ]
 
     async def update_status(

@@ -47,6 +47,9 @@ class Sku(Base):
     capacity_wh: Mapped[int | None] = mapped_column(Integer)
     capacity_tier: Mapped[str | None] = mapped_column(Text)  # 'entry' | 'mid'
     is_competitor: Mapped[bool] = mapped_column(Boolean, nullable=False)
+    dashboard_enabled: Mapped[bool] = mapped_column(
+        Boolean, nullable=False, default=False, server_default="false", index=True
+    )
     created_at: Mapped[datetime] = mapped_column(
         default=utcnow, server_default=func.now()
     )

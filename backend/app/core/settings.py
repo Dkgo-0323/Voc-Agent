@@ -3,8 +3,9 @@
 应用全局配置，通过 Pydantic BaseSettings 从环境变量（.env）读取。
 使用方式：from backend.app.core.settings import settings
 """
+
 from functools import lru_cache
-from typing import Literal
+from typing import Any, Literal
 
 from pydantic import Field, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -19,8 +20,8 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
-        case_sensitive=False,   # DATABASE_URL 和 database_url 等价
-        extra="ignore",         # 忽略 .env 中未声明的额外字段
+        case_sensitive=False,  # DATABASE_URL 和 database_url 等价
+        extra="ignore",  # 忽略 .env 中未声明的额外字段
     )
 
     # ── 应用基础 ──────────────────────────────────────────────
@@ -37,22 +38,32 @@ class Settings(BaseSettings):
     # ── Milvus ───────────────────────────────────────────────
     milvus_host: str = "localhost"
     milvus_port: int = 19530
-    milvus_collection_name: str = "aspect_mentions_vectors"
+    milvus_collection_name: str = "aspect_mentions_vectors_1024"
 
     # ── Reddit API ───────────────────────────────────────────
     reddit_client_id: str = ""
     reddit_client_secret: str = ""
     reddit_user_agent: str = "voc-agent/0.1"
 
-    # ── OpenAI ───────────────────────────────────────────────
+    # ── Legacy OpenAI key（保留兼容旧配置）────────────────────
     openai_api_key: str = ""
+
+    # ── Enrichment LLM（OpenAI-compatible）───────────────────
+    llm_api_key: str = ""
+    llm_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    llm_model: str = "glm-4-flashx-250414"
+    llm_max_tokens: int = Field(default=4096, ge=256, le=16384)
+    llm_timeout_seconds: float = Field(default=60, gt=0, le=300)
+    llm_max_retries: int = Field(default=2, ge=0, le=5)
+    llm_extra_body: dict[str, Any] = Field(default_factory=dict)
+    aspect_quality_threshold: float = Field(default=0.55, ge=0, le=1)
 
     # ── Embedding（支持 OpenAI-compatible 国内服务）──────────
     embedding_api_key: str = ""
-    embedding_base_url: str = "https://api.openai.com/v1"
-    embedding_model: str = "text-embedding-3-small"
-    embedding_dimensions: int = Field(default=1536, gt=0)
-    embedding_batch_size: int = Field(default=100, ge=1, le=100)
+    embedding_base_url: str = "https://open.bigmodel.cn/api/paas/v4/"
+    embedding_model: str = "embedding-3"
+    embedding_dimensions: int = Field(default=1024, gt=0)
+    embedding_batch_size: int = Field(default=64, ge=1, le=100)
 
     # ── JWT ──────────────────────────────────────────────────
     jwt_secret_key: str = Field(
@@ -88,13 +99,9 @@ class Settings(BaseSettings):
         """生产环境强制检查敏感配置。"""
         if self.app_env == "production":
             if self.jwt_secret_key == "dev-secret-key-replace-in-production":
-                raise ValueError(
-                    "生产环境必须设置真实的 JWT_SECRET_KEY"
-                )
+                raise ValueError("生产环境必须设置真实的 JWT_SECRET_KEY")
             if self.admin_password == "change-me-in-production":
-                raise ValueError(
-                    "生产环境必须设置真实的 ADMIN_PASSWORD"
-                )
+                raise ValueError("生产环境必须设置真实的 ADMIN_PASSWORD")
         return self
 
 

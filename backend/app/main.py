@@ -8,7 +8,10 @@ lifespan 事件管理：
 
 当前暴露端点：
   GET /health  → 基础设施健康检查（DB 连通性）
+  GET /api/*   → Dashboard 聚合数据
 """
+
+import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
@@ -18,8 +21,13 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.sql import text
 
-from backend.app.core.database import close_db, get_engine, init_db
+from backend.app.api.dashboard import router as dashboard_router
+from backend.app.core.database import close_db, get_db_context, get_engine, init_db
 from backend.app.core.settings import settings
+from backend.app.db.repositories.aspect_repo import AspectRepository
+from pipelines.config.targets import LOCKED_SKU_CODES
+from pipelines.embedding.embedder import Embedder
+from pipelines.embedding.milvus_repo import MilvusRepository
 
 # ── 日志配置 ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -40,7 +48,20 @@ async def lifespan(app: FastAPI):
     """
     # ── Startup ──
     logger.info(f"🚀 VOC Agent 启动中 [env={settings.app_env}]")
-    await init_db()
+    try:
+        await init_db()
+        async with get_db_context() as session:
+            await AspectRepository(session).validate_locked_skus(set(LOCKED_SKU_CODES))
+        await asyncio.to_thread(MilvusRepository().setup_collection)
+        await Embedder().validate_dimension_contract()
+    except Exception:
+        await close_db()
+        raise
+    logger.info(
+        "Embedding 维度契约验证通过 [model=%s, dimensions=%d]",
+        settings.embedding_model,
+        settings.embedding_dimensions,
+    )
     logger.info("✅ 所有基础设施初始化完成")
 
     yield  # ← 应用正常运行期间挂起在这里
@@ -56,7 +77,7 @@ app = FastAPI(
     title="VOC Agent API",
     description="户外电源竞品舆情分析系统",
     version="0.1.0",
-    docs_url="/docs" if settings.is_development else None,   # 生产关闭 Swagger
+    docs_url="/docs" if settings.is_development else None,  # 生产关闭 Swagger
     redoc_url="/redoc" if settings.is_development else None,
     lifespan=lifespan,
 )
@@ -69,6 +90,8 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(dashboard_router)
 
 
 # ── 路由 ──────────────────────────────────────────────────────────────────────

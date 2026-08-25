@@ -16,6 +16,7 @@ class DocumentRead(BaseModel):
     id: UUID
     sku_id: UUID
     sku_code: str
+    sku_name: str
     platform: str
     external_id: str
     title: str | None
@@ -45,9 +46,17 @@ class AspectMentionCreate(BaseModel):
     embed_text: str | None = None
 
 
+class AspectMentionRead(AspectMentionCreate):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    created_at: datetime
+
+
 class TopAspect(BaseModel):
     aspect_label: str
     count: int
+    positive_count: int
     avg_sentiment_score: float
 
 
@@ -56,3 +65,36 @@ class SkuTrend(BaseModel):
     aspect_label: str
     positive_count: int
     negative_count: int
+    neutral_count: int
+    avg_quality_score: float
+
+
+class WeekAggregation(BaseModel):
+    week_id: int
+    doc_count: int
+    mention_count: int
+    skus_covered: list[str]
+
+
+class SkuRanking(BaseModel):
+    sku_code: str
+    sku_name: str
+    mention_count: int
+    positive_count: int
+    negative_count: int
+
+
+class SkuMetadata(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    sku_code: str
+    brand: str
+    model: str
+    capacity_wh: int | None
+    capacity_tier: str | None
+    is_competitor: bool
+    dashboard_enabled: bool
+
+    @property
+    def sku_name(self) -> str:
+        return f"{self.brand} {self.model}"
