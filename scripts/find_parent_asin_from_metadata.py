@@ -1,8 +1,9 @@
 # scripts/find_parent_asin_from_metadata.py
 # 从 HF 数据集的 metadata 文件查 parent_asin，不依赖 Amazon 页面
 
+import json
+
 from huggingface_hub import hf_hub_download, list_repo_files
-import json, os
 
 TARGET_ASINS = {
     "B0B9XB57XM": "ecoflow-delta2",
@@ -21,7 +22,7 @@ all_files = list(list_repo_files(REPO_ID, repo_type="dataset"))
 
 # metadata 文件通常命名为 meta_Patio_Lawn_and_Garden.jsonl
 meta_files = [f for f in all_files if "Patio" in f and "meta" in f.lower()]
-print(f"找到 metadata 文件：")
+print("找到 metadata 文件：")
 for f in meta_files:
     print(f"  {f}")
 
@@ -52,16 +53,16 @@ if not meta_local:
     exit(1)
 
 # ── Step 3: 扫描 metadata，建立 child_asin → parent_asin 映射 ────
-print(f"\n=== 扫描 metadata 文件 ===")
+print("\n=== 扫描 metadata 文件 ===")
 
 # 收集两个方向的映射
-child_to_parent = {}   # child_asin  → parent_asin
-parent_to_info  = {}   # parent_asin → {title, brand, child_asins}
+child_to_parent = {}  # child_asin  → parent_asin
+parent_to_info = {}  # parent_asin → {title, brand, child_asins}
 
 target_set = set(TARGET_ASINS.keys())
 lines_scanned = 0
 
-with open(meta_local, "r", encoding="utf-8", errors="ignore") as f:
+with open(meta_local, encoding="utf-8", errors="ignore") as f:
     for line in f:
         lines_scanned += 1
         if lines_scanned % 500_000 == 0:
@@ -72,7 +73,7 @@ with open(meta_local, "r", encoding="utf-8", errors="ignore") as f:
             continue
 
         parent = item.get("parent_asin", "")
-        asin   = item.get("asin", parent)   # 有些 metadata 没有单独的 asin 字段
+        asin = item.get("asin", parent)  # 有些 metadata 没有单独的 asin 字段
 
         # 记录映射
         if asin:
@@ -84,16 +85,16 @@ with open(meta_local, "r", encoding="utf-8", errors="ignore") as f:
         for check in [asin, parent]:
             if check in target_set:
                 parent_to_info[parent] = {
-                    "title":        item.get("title", ""),
-                    "brand":        item.get("brand", ""),
-                    "child_asin":   asin,
-                    "matched_via":  check,
+                    "title": item.get("title", ""),
+                    "brand": item.get("brand", ""),
+                    "child_asin": asin,
+                    "matched_via": check,
                 }
 
 print(f"\n扫描完成，共 {lines_scanned:,} 行")
 
 # ── Step 4: 输出结果 ──────────────────────────────────────────────
-print(f"\n{'='*60}")
+print(f"\n{'=' * 60}")
 print("=== ASIN 映射结果 ===")
 
 found_parents = {}
@@ -114,11 +115,11 @@ for target_asin, sku in TARGET_ASINS.items():
         print(f"  ⚠️  应使用 parent_asin [{parent}] 重新扫描 review 文件")
         found_parents[sku] = parent
     elif parent == target_asin:
-        print(f"  ✅ 已是 parent_asin，review 文件中应能直接找到")
+        print("  ✅ 已是 parent_asin，review 文件中应能直接找到")
 
 # 输出需要用 parent_asin 重新搜索的列表
 if found_parents:
-    print(f"\n{'='*60}")
+    print(f"\n{'=' * 60}")
     print("需要用以下 parent_asin 重新扫描 review 文件：")
     for sku, p_asin in found_parents.items():
         print(f"  {sku}: {p_asin}")

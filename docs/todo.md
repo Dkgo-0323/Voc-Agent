@@ -23,7 +23,7 @@
   - [ ] Calculate actionable quality score (`quality_score`).
 - [ ] **Milvus Integration**:
   - [ ] Setup Milvus async repository.
-  - [ ] Calculate embeddings using `text-embedding-3-small` (dim=1536) on `mention_text` + `context_window`.
+- [ ] Calculate embeddings using Zhipu `embedding-3` (dim from `EMBEDDING_DIMENSIONS`, currently 1024) on `mention_text` + `context_window`.
   - [ ] Upsert to Milvus. **CRITICAL**: Use `aspect_mentions.id` (UUID) as Milvus Vector primary key. Map `sku_code`, `aspect_label`, `sentiment`, `week_id` as metadata.
 - [ ] **Scheduling (APScheduler)**:
   - [ ] Fill pipeline logic in `backend/worker/jobs.py`.

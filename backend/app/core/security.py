@@ -3,10 +3,11 @@
 JWT 签发与验证骨架。
 Week 1 仅建立结构，Week 2 接入鉴权中间件时完善。
 """
-from datetime import datetime, timedelta, timezone
+
+from datetime import UTC, datetime, timedelta
 from typing import Any
 
-from jose import JWTError, jwt
+from jose import jwt
 from passlib.context import CryptContext
 
 from backend.app.core.settings import settings
@@ -32,13 +33,13 @@ def create_access_token(
     签发 JWT Token。
     subject：通常是用户标识（MVP 阶段固定为 "admin"）
     """
-    expire = datetime.now(timezone.utc) + (
+    expire = datetime.now(UTC) + (
         expires_delta or timedelta(days=settings.jwt_expire_days)
     )
     payload = {
         "sub": str(subject),
         "exp": expire,
-        "iat": datetime.now(timezone.utc),
+        "iat": datetime.now(UTC),
     }
     return jwt.encode(
         payload,

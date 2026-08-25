@@ -12,19 +12,19 @@ import asyncio
 import hashlib
 import json
 import logging
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from sqlalchemy import text
 
-from backend.app.core.database import get_db_context, init_db, close_db
+from backend.app.core.database import close_db, get_db_context, init_db
 from pipelines.config.targets import REVIEW_FILE_PATH, TARGETS
 
 logger = logging.getLogger(__name__)
 
 # ── 常量 ─────────────────────────────────────────────────────────
-BATCH_SIZE   = 500    # 每批写入行数，平衡内存和往返次数
-MIN_BODY_LEN = 20     # 过短评论直接丢弃（"Great!"之类无分析价值）
+BATCH_SIZE = 500  # 每批写入行数，平衡内存和往返次数
+MIN_BODY_LEN = 20  # 过短评论直接丢弃（"Great!"之类无分析价值）
 
 
 # ── 工具函数 ──────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ def _parse_ts(ts) -> datetime | None:
         if isinstance(ts, (int, float)):
             # 毫秒级时间戳
             ts_sec = ts / 1000 if ts > 1e10 else ts
-            return datetime.fromtimestamp(ts_sec, tz=timezone.utc)
+            return datetime.fromtimestamp(ts_sec, tz=UTC)
         if isinstance(ts, str):
             return datetime.fromisoformat(ts.replace("Z", "+00:00"))
     except Exception:
@@ -54,9 +54,9 @@ def _parse_ts(ts) -> datetime | None:
 def _iso_week(dt: datetime | None) -> int:
     """转为 YYYYWW 格式，如 202408，None 时返回当前周"""
     if dt is None:
-        dt = datetime.now(timezone.utc)
-    iso = dt.isocalendar()          # (year, week, weekday)
-    return iso[0] * 100 + iso[1]    # e.g. 2024 * 100 + 8 = 202408
+        dt = datetime.now(UTC)
+    iso = dt.isocalendar()  # (year, week, weekday)
+    return iso[0] * 100 + iso[1]  # e.g. 2024 * 100 + 8 = 202408
 
 
 def _build_asin_index() -> dict[str, str]:
@@ -74,7 +74,9 @@ def _build_asin_index() -> dict[str, str]:
 # ── 主流程 ────────────────────────────────────────────────────────
 async def _get_sku_id_map(session) -> dict[str, str]:
     """从数据库查 sku_code → id 映射"""
-    rows = await session.execute(text("SELECT sku_code, id FROM skus"))
+    rows = await session.execute(
+        text("SELECT sku_code, id FROM skus WHERE dashboard_enabled = true")
+    )
     return {row.sku_code: str(row.id) for row in rows}
 
 
@@ -117,14 +119,14 @@ async def _insert_batch(session, batch: list[dict]) -> tuple[int, int]:
         {"rows": json.dumps(batch)},
     )
     inserted = result.rowcount
-    skipped  = len(batch) - inserted
+    skipped = len(batch) - inserted
     return inserted, skipped
 
 
 async def load_amazon_reviews(
     file_path: str | None = None,
-    limit: int | None = None,          # 调试用：只处理前N条
-    dry_run: bool = False,             # True时只扫描不写库
+    limit: int | None = None,  # 调试用：只处理前N条
+    dry_run: bool = False,  # True时只扫描不写库
 ) -> dict:
     """
     主入口函数
@@ -135,14 +137,16 @@ async def load_amazon_reviews(
         raise FileNotFoundError(f"Review 文件不存在: {path}")
 
     asin_index = _build_asin_index()
-    logger.info(f"ASIN 索引已建立，共 {len(asin_index)} 个 ASIN 映射到 {len(TARGETS)} 个 SKU")
+    logger.info(
+        f"ASIN 索引已建立，共 {len(asin_index)} 个 ASIN 映射到 {len(TARGETS)} 个 SKU"
+    )
 
     stats = {
         "total_scanned": 0,
-        "inserted":      0,
-        "skipped":       0,   # 重复，ON CONFLICT跳过
-        "no_sku_match":  0,   # ASIN不在目标列表
-        "too_short":     0,   # body太短
+        "inserted": 0,
+        "skipped": 0,  # 重复，ON CONFLICT跳过
+        "no_sku_match": 0,  # ASIN不在目标列表
+        "too_short": 0,  # body太短
     }
 
     await init_db()
@@ -153,7 +157,7 @@ async def load_amazon_reviews(
 
             batch: list[dict] = []
 
-            with open(path, "r", encoding="utf-8", errors="ignore") as f:
+            with open(path, encoding="utf-8", errors="ignore") as f:
                 for raw_line in f:
                     # ── 解析 ──────────────────────────────────────────
                     try:
@@ -173,9 +177,9 @@ async def load_amazon_reviews(
                         )
 
                     # ── ASIN 匹配（child 和 parent 都查）────────────
-                    asin        = review.get("asin", "")
+                    asin = review.get("asin", "")
                     parent_asin = review.get("parent_asin", "")
-                    sku_code    = asin_index.get(asin) or asin_index.get(parent_asin)
+                    sku_code = asin_index.get(asin) or asin_index.get(parent_asin)
 
                     if not sku_code:
                         stats["no_sku_match"] += 1
@@ -184,7 +188,9 @@ async def load_amazon_reviews(
                     sku_id = sku_id_map.get(sku_code)
                     if not sku_id:
                         # SKU 在 targets.py 里有但数据库没有 seed → 跳过并警告
-                        logger.warning(f"sku_code [{sku_code}] 不在数据库中，请先运行 seed.py")
+                        logger.warning(
+                            f"sku_code [{sku_code}] 不在数据库中，请先运行 seed.py"
+                        )
                         continue
 
                     # ── 正文过滤 ──────────────────────────────────────
@@ -195,26 +201,28 @@ async def load_amazon_reviews(
 
                     # ── 字段提取 ──────────────────────────────────────
                     published_at = _parse_ts(review.get("timestamp"))
-                    week_id      = _iso_week(published_at)
-                    rating_raw   = review.get("rating")
-                    rating       = int(rating_raw) if rating_raw is not None else None
+                    week_id = _iso_week(published_at)
+                    rating_raw = review.get("rating")
+                    rating = int(rating_raw) if rating_raw is not None else None
 
                     # external_id：优先用 review_id，没有就用 asin+user_id 拼合
-                    review_id   = review.get("review_id") or review.get("id", "")
-                    user_id     = review.get("user_id", "")
+                    review_id = review.get("review_id") or review.get("id", "")
+                    user_id = review.get("user_id", "")
                     external_id = review_id or f"{asin}_{user_id}"
 
                     row = {
-                        "sku_id":       sku_id,
-                        "platform":     "amazon",
-                        "external_id":  external_id,
-                        "title":        (review.get("title") or "")[:500],   # 防超长
-                        "body":         body,
-                        "rating":       rating,
-                        "author_hash":  _hash_user(user_id),
-                        "source_url":   f"https://www.amazon.com/dp/{asin}",
-                        "published_at": published_at.isoformat() if published_at else None,
-                        "week_id":      week_id,
+                        "sku_id": sku_id,
+                        "platform": "amazon",
+                        "external_id": external_id,
+                        "title": (review.get("title") or "")[:500],  # 防超长
+                        "body": body,
+                        "rating": rating,
+                        "author_hash": _hash_user(user_id),
+                        "source_url": f"https://www.amazon.com/dp/{asin}",
+                        "published_at": published_at.isoformat()
+                        if published_at
+                        else None,
+                        "week_id": week_id,
                     }
 
                     batch.append(row)
@@ -224,7 +232,7 @@ async def load_amazon_reviews(
                         inserted, skipped = await _insert_batch(session, batch)
                         await session.commit()
                         stats["inserted"] += inserted
-                        stats["skipped"]  += skipped
+                        stats["skipped"] += skipped
                         batch.clear()
 
             # ── 最后一批 ──────────────────────────────────────────────
@@ -232,7 +240,7 @@ async def load_amazon_reviews(
                 inserted, skipped = await _insert_batch(session, batch)
                 await session.commit()
                 stats["inserted"] += inserted
-                stats["skipped"]  += skipped
+                stats["skipped"] += skipped
     finally:
         await close_db()
 
@@ -249,8 +257,8 @@ if __name__ == "__main__":
     )
 
     parser = argparse.ArgumentParser(description="Amazon Review Loader")
-    parser.add_argument("--limit",   type=int,  default=None,  help="只处理前N条（调试用）")
-    parser.add_argument("--dry-run", action="store_true",      help="只扫描不写库")
+    parser.add_argument("--limit", type=int, default=None, help="只处理前N条（调试用）")
+    parser.add_argument("--dry-run", action="store_true", help="只扫描不写库")
     args = parser.parse_args()
 
     async def main():

@@ -249,7 +249,7 @@ Collection name: aspect_mentions
 
 Fields:
   id              VARCHAR        # 与 PostgreSQL aspect_mentions.id 相同
-  embedding       FLOAT_VECTOR   # dim=1536（text-embedding-3-small）
+    embedding       FLOAT_VECTOR   # dim 读取 EMBEDDING_DIMENSIONS（embedding-3 当前为 1024）
   sku_code        VARCHAR        # metadata filter用（slug格式）
   aspect_label    VARCHAR        # metadata filter用
   sentiment       VARCHAR        # metadata filter用
@@ -414,7 +414,7 @@ Week 1 结束后，Week 2 接手时需要：
    - APScheduler Job 注册：在 `worker/jobs.py` 填充实际的 pipeline 调用逻辑
 3. **注意事项：**
    - `aspect_mentions.id` 必须与 Milvus vector ID 保持一致（Week 2 写入时需显式指定）
-   - Embedding 模型选定后维度需与 Milvus Collection `dim` 参数一致（当前规划：`text-embedding-3-small`，dim=1536）
+- Embedding 模型与 Milvus Collection `dim` 必须和 `EMBEDDING_DIMENSIONS` 一致（正式采用 `embedding-3`，当前为 1024）
 
 ---
 

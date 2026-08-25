@@ -8,6 +8,7 @@
 - get_db() 作为 FastAPI Depends 注入，每个请求独立 session，自动提交/回滚
 - get_db_context() 供非 HTTP 场景（Worker、脚本）使用
 """
+
 import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
@@ -24,6 +25,7 @@ from backend.app.core.settings import settings
 
 logger = logging.getLogger(__name__)
 
+
 # ── 引擎配置 ──────────────────────────────────────────────────────────────────
 def _build_engine() -> AsyncEngine:
     """
@@ -33,11 +35,11 @@ def _build_engine() -> AsyncEngine:
     """
     return create_async_engine(
         settings.database_url,
-        echo=settings.is_development,       # True → 控制台打印所有 SQL
-        pool_size=10,                        # 常驻连接数
-        max_overflow=20,                     # 峰值额外连接数
-        pool_pre_ping=True,                  # 每次取连接前 PING，防止陈旧连接
-        pool_recycle=3600,                   # 1小时回收连接，防止 PG 端超时断开
+        echo=settings.is_development,  # True → 控制台打印所有 SQL
+        pool_size=10,  # 常驻连接数
+        max_overflow=20,  # 峰值额外连接数
+        pool_pre_ping=True,  # 每次取连接前 PING，防止陈旧连接
+        pool_recycle=3600,  # 1小时回收连接，防止 PG 端超时断开
     )
 
 
