@@ -57,6 +57,9 @@ class Settings(BaseSettings):
     llm_max_retries: int = Field(default=2, ge=0, le=5)
     llm_extra_body: dict[str, Any] = Field(default_factory=dict)
     aspect_quality_threshold: float = Field(default=0.55, ge=0, le=1)
+    min_reliable_sample: int = Field(default=20, ge=1)
+    max_rag_top_k: int = Field(default=20, ge=1, le=100)
+    recent_message_limit: int = Field(default=8, ge=1, le=50)
 
     # ── Embedding（支持 OpenAI-compatible 国内服务）──────────
     embedding_api_key: str = ""
@@ -71,7 +74,7 @@ class Settings(BaseSettings):
         description="生产环境必须替换为随机 256-bit key",
     )
     jwt_algorithm: str = "HS256"
-    jwt_expire_days: int = 7
+    jwt_expire_days: int = Field(default=7, ge=1)
 
     # ── 管理员密码 ───────────────────────────────────────────
     admin_password: str = "change-me-in-production"

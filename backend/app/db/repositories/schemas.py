@@ -5,6 +5,7 @@ models to the pipeline and API layers.
 """
 
 from datetime import datetime
+from typing import Any
 from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field
@@ -98,3 +99,92 @@ class SkuMetadata(BaseModel):
     @property
     def sku_name(self) -> str:
         return f"{self.brand} {self.model}"
+
+
+class WeeklyReportRow(BaseModel):
+    report_id: UUID
+    sku_code: str
+    week_id: int
+    report_md: str | None
+    summary: str | None
+    generated_at: datetime
+
+
+class ChatSessionRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    title: str | None
+    created_by: str | None
+    is_active: bool
+    created_at: datetime
+    updated_at: datetime
+
+
+class ChatMessageRead(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    session_id: UUID
+    role: str
+    content: str
+    tool_calls: dict[str, Any] | None
+    tool_results: dict[str, Any] | None
+    cited_ids: dict[str, Any] | None
+    created_at: datetime
+
+
+class PersistedTurnRow(BaseModel):
+    user_message_id: UUID
+    assistant_message_id: UUID
+
+
+class AnalyticsCountRow(BaseModel):
+    sku_code: str
+    review_count: int
+    mention_count: int
+
+
+class AnalyticsDistributionRow(BaseModel):
+    label: str
+    mention_count: int
+    positive_count: int = 0
+    negative_count: int = 0
+    neutral_count: int = 0
+
+
+class AnalyticsTrendRow(BaseModel):
+    week_id: int
+    review_count: int
+    mention_count: int
+    positive_count: int
+    negative_count: int
+    neutral_count: int
+
+
+class AnalyticsComparisonRow(BaseModel):
+    sku_code: str
+    capacity_tier: str | None
+    review_count: int
+    mention_count: int
+    positive_count: int
+    negative_count: int
+    neutral_count: int
+
+
+class RetrievedEvidenceRow(BaseModel):
+    mention_id: UUID
+    document_id: UUID
+    sku_code: str
+    aspect_label: str
+    sentiment: str
+    mention_text: str
+    context_window: str | None
+    quality_score: float
+    week_id: int
+    platform: str
+    published_at: datetime | None
+    source_url: str | None
+    title: str | None
+    rating: int | None
+    review_text: str
