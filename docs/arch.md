@@ -1,7 +1,7 @@
-# Architecture & Key Decisions (Agent & RAG MVP)
+# Architecture & Key Decisions (VOC Agent MVP)
 
 ## 0. Scope & Upgrades
-- **Target**: Outdoor power stations VOC weekly intelligence + Interactive Agent.
+- **Target**: Outdoor power stations VOC weekly intelligence with a controlled multi-turn analytical Agent. Week 3 is signed off: minimal JWT authentication, structured Agent streaming, and the deterministic 19-query smoke/golden acceptance set are complete.
 - **Core Stack**: Python 3.11+, `uv`, FastAPI (Async), SQLAlchemy 2.0 (asyncio), PostgreSQL 15, Milvus 2.x.
 - **Major Upgrades from v1**:
   - Completely abandoned SQLite to avoid Alembic migration incompatibilities with JSONB/ARRAY types.
@@ -12,8 +12,9 @@
 ## 1. System Topology
 - **Data Ingestion (Pipelines)**: Weekly batch processing. Fetches from PRAW (Reddit) & McAuley dataset (Amazon). Sanitizes via Presidio.
 - **Worker Process**: Independent python process (`python -m backend.worker.main`) running APScheduler to execute the ingestion and enrichment pipelines.
-- **Backend (FastAPI)**: Exposes REST APIs for dashboards AND a Stateful Chat API for the Agent. Single password + JWT authentication.
-- **Agent Layer**: Multi-turn LLM Function Calling router.
+- **Backend (FastAPI)**: Exposes PostgreSQL-backed dashboard APIs and `POST /api/ask` as a structured SSE stream.
+- **Agent Layer**: A bounded handwritten function-calling router composes deterministic analytics, traceable evidence retrieval, and read-only stored reports. PostgreSQL stores recent conversation history and compact execution metadata.
+- **Authentication**: A configured single-password login issues expiring JWTs; bearer verification protects `/api/ask`. The existing read-only dashboard routes remain public.
 
 ## 2. Directory Structure
 
@@ -25,12 +26,8 @@
     │   ├── app/
     │   │   ├── main.py
     │   │   ├── core/                # settings, security.py (JWT), database.py (async engine)
-    │   │   ├── api/
-    │   │   ├── agent/               # ★ Core Agent Logic
-    │   │   │   ├── tool_sql.py      # Structured data, trends, comparisons
-    │   │   │   ├── tool_rag.py      # Quotes, aspect semantic search
-    │   │   │   ├── tool_report.py   # Markdown summaries
-    │   │   │   └── router.py        # Pure function calling loop
+    │   │   ├── api/                 # Dashboard routes and SSE /api/ask transport
+    │   │   ├── agent/               # Schemas, tools, router, LLM adapter, conversation service
     │   │   ├── db/
     │   │   │   ├── models.py        # 7 core ORM models
     │   │   │   ├── seed.py          # Initial SKU injection
@@ -48,16 +45,46 @@
     ├── frontend/                    # Next.js
     └── docker-compose.yml           # PostgreSQL + Milvus
 
-## 3. Agent Design & Tool Boundaries
+## 3. Week 2 Pipeline & Dashboard
 
-The Agent operates on a handwritten multi-turn loop. It streams output to the frontend in two stages: ① Tool execution (loading state) → ② Final answer token streaming.
+### Processing State Contract
+- `documents.processing_status` progresses through `raw` → `enriched` → `embedded`; a per-document extraction or embedding error moves only that document to `failed` with `processing_error` populated.
+- The worker fetches only raw documents belonging to dashboard-enabled SKUs. The explicit acceptance runner accepts only caller-supplied raw UUIDs and rejects duplicate or non-raw input.
+- Extraction accepts at most three evidence-grounded aspects per review. `mention_text` must be an exact review substring (≤60 characters); quality is calculated before persistence.
+- Model-supplied `context_window` is limited to 200 characters. If the model returns an oversized context for an otherwise valid mention, the pipeline rebuilds a bounded context from the exact review evidence rather than discarding the mention.
+- `embed_text` is persisted in PostgreSQL before the document advances to `embedded`. Milvus upserts use `aspect_mentions.id` as the vector ID and carry `sku_code`, `aspect_label`, `sentiment`, `week_id`, and `quality_score` metadata.
 
-### Routing Priority & Tools
-1. **`tool_report` (Priority 1)**: Triggered for macro/summary questions ("Last week's market summary"). Returns Markdown block. Fallback to `tool_rag` if report doesn't exist.
-2. **`tool_rag` (Priority 2)**: Triggered when user explicitly wants "quotes/exact words/specific examples" ("How do users describe Delta 2 noise?"). Returns raw text + source metadata.
-3. **`tool_sql` (Priority 3)**: Triggered for "data/trends/rankings/comparisons" ("Which brand had the most negative reviews?"). Returns structured numbers. *Comparisons are automatically restricted to the same `capacity_tier`.*
+### Operational Validation
+- The Week 2 acceptance runner processed one selected document for each locked SKU in a controlled network environment.
+- Final acceptance produced 10 `aspect_mentions` and 10 Milvus vectors for the five documents. UUID, scalar metadata, evidence, quality, and `embed_text` checks passed with no missing or orphan vectors.
+- Dashboard aggregates are served by `GET /api/weeks`, `GET /api/overview`, and `GET /api/skus/{sku_code}/trends`; only dashboard-enabled SKUs and mentions meeting the configured quality threshold are included.
 
-## 4. Storage & Schema Contracts
+## 4. Implemented Agent Design & Tool Boundaries
+
+The Agent uses a pure handwritten function-calling loop with a hard maximum of three attempted tool calls. Tools are composable; there is no mutually exclusive priority chain.
+
+- **`tool_report`** reads existing `weekly_reports` only. A missing report returns `not_found`; the Router may then choose analytics and/or RAG. It never generates a replacement report.
+- **`tool_sql`** exposes only six fixed deterministic operations: review count, sentiment distribution, aspect distribution, trend, aspect trend, and SKU comparison. It never accepts arbitrary SQL. Application code enforces dashboard-enabled SKUs, the shared quality threshold, same-`capacity_tier` comparison, and configurable low-sample warnings.
+- **`tool_rag`** accepts structured query, SKU, week, sentiment, aspect, and `top_k` arguments. Application code validates locked/dashboard-enabled SKUs, taxonomy, ISO weeks, maximum `top_k`, and quality filtering before Milvus/PostgreSQL retrieval.
+
+The LLM may interpret intent, regenerate explicit tool arguments from visible recent messages, select and sequence approved tools, synthesize supported output, and identify cited evidence IDs. Deterministic code owns validation, calculation, business constraints, provenance, persistence, and streaming serialization.
+
+### Evidence, conversation, and failure behavior
+
+- Provenance remains `Milvus vector id == aspect_mentions.id -> documents.id`; no second ID mapping exists.
+- Retrieved evidence and final citations are distinct. Only evidence IDs actually referenced in the final answer are emitted. Citations provide an exact preview plus stable source metadata for expansion.
+- Conversation context loads the most recent configurable N messages (default 8). No hidden active SKU/week/aspect/sentiment state or session summarization exists.
+- No-data requests abstain instead of using model prior knowledge. A failed tool may produce a disclosed partial answer only when another successful result materially supports it.
+- SSE emits real-time `tool_started`/`tool_completed`, then final `answer_delta`, used `citation` events, and `done`; request-level failures end with structured `error`. Successful final events are sent only after the chat transaction commits.
+- Reliability errors are normalized into safe structured categories. Tool errors retain compact code/retryability metadata; LLM failures use `llm_timeout` or `llm_request_failed`, and embedding timeouts use `rag_embedding_timeout`. Provider exception text, stack traces, and hidden reasoning are never streamed or persisted.
+
+### Week 3 acceptance status
+
+- The deterministic 19-query smoke/golden set covers quantitative, trend, same-tier and cross-tier comparison, evidence, combined SQL+RAG, recent-message follow-up, no-data, and fallback behavior.
+- The final Week 3 regression run preserves the validated Week 2 processing pipeline, embedding dimension contract, PostgreSQL/Milvus UUID alignment, dashboard APIs, shared quality filtering, and independent APScheduler worker process.
+- This sign-off does not claim a live external LLM/Milvus/PostgreSQL end-to-end run; those services remain a deployment-validation concern.
+
+## 5. Storage & Schema Contracts
 
 ### Database Choices
 - **RDBMS**: PostgreSQL 15. Managed by Alembic (`env.py` configured with `run_async_migrations`).
@@ -78,14 +105,14 @@ The Agent operates on a handwritten multi-turn loop. It streams output to the fr
 
 ### ER & Tables
 - `skus` (Contains `capacity_tier` to prevent cross-tier comparisons)
-- `documents` (Raw reviews, handles PII `author_hash`, UNIQUE `platform` + `external_id`)
+- `documents` (Raw reviews, handles PII `author_hash`, UNIQUE `platform` + `external_id`; includes processing status/error fields for the Week 2 pipeline)
 - `aspect_mentions` (Granular aspects, mapped 1:1 with Milvus Vectors)
 - `weekly_reports` & `weekly_topics` (Summaries)
 - `chat_sessions` & `chat_messages`
   - `chat_messages` stores `tool_calls` and `tool_results` as JSONB.
   - *Decision*: `tool_results` only stores execution metadata (count/time), NOT the raw data payload, to save DB space and keep debugging clean.
 
-## 5. Flowchart
+## 6. Flowchart
 
     flowchart TD
       %% Batch Pipeline (Worker Process)
@@ -97,14 +124,14 @@ The Agent operates on a handwritten multi-turn loop. It streams output to the fr
         D -->|Sync UUID| F[(PostgreSQL)]
       end
 
-      %% Real-time User Interaction (API Process)
+      %% Real-time User Interaction (API Process; /api/ask requires JWT)
       subgraph Interaction [FastAPI Process]
         U((User)) -->|Ask: 'Delta 2 noise?'| H[Next.js Frontend]
         H -->|POST /api/ask| I[Pure Function Calling Router]
         
-        I -->|1. Macro| J[tool_report]
-        I -->|2. Exact Quotes| K[tool_rag]
-        I -->|3. Stats/Compare| L[tool_sql]
+        I -->|Stored macro report| J[tool_report]
+        I -->|Exact evidence| K[tool_rag]
+        I -->|Deterministic metrics| L[tool_sql]
         
         J --> F
         K --> E
@@ -112,5 +139,5 @@ The Agent operates on a handwritten multi-turn loop. It streams output to the fr
         L --> F
         
         I --> M[Synthesize Answer with Citations]
-        M -->|Two-stage Stream| H
+        M -->|Structured SSE + used citations| H
       end

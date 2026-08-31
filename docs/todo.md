@@ -16,33 +16,41 @@
 - [x] **Worker Skeleton**: Setup independent worker process (`python -m backend.worker.main`) using APScheduler.
 - [x] **Infra**: `docker-compose up` for PostgreSQL + Milvus 2.x.
 
-## Week 2: Enrichment, Embedding & APScheduler (🚧 Up Next)
-- [ ] **Local Enrichment Pipeline**:
-  - [ ] Read raw data from `documents` table.
-  - [ ] Aspect extraction & sentiment analysis -> write to `aspect_mentions` table.
-  - [ ] Calculate actionable quality score (`quality_score`).
-- [ ] **Milvus Integration**:
-  - [ ] Setup Milvus async repository.
-- [ ] Calculate embeddings using Zhipu `embedding-3` (dim from `EMBEDDING_DIMENSIONS`, currently 1024) on `mention_text` + `context_window`.
-  - [ ] Upsert to Milvus. **CRITICAL**: Use `aspect_mentions.id` (UUID) as Milvus Vector primary key. Map `sku_code`, `aspect_label`, `sentiment`, `week_id` as metadata.
-- [ ] **Scheduling (APScheduler)**:
-  - [ ] Fill pipeline logic in `backend/worker/jobs.py`.
-  - [ ] Schedule the batch job to run seamlessly in the independent worker process.
-- [ ] **Basic Dashboard APIs**: Implement GET `/weeks`, `/overview`, `/skus`.
+## Week 2: Enrichment, Embedding & APScheduler (✅ Completed)
+- [x] **Local Enrichment Pipeline**:
+  - [x] Read only raw documents for dashboard-enabled SKUs.
+  - [x] Extract evidence-grounded aspects and sentiment, then persist to `aspect_mentions`.
+  - [x] Calculate and enforce the actionable `quality_score` threshold in dashboard aggregates.
+  - [x] Isolate failures per document and retain the processing error without blocking valid peers.
+- [x] **Milvus Integration**:
+  - [x] Set up the Milvus repository and enforce the 1024-dimension embedding contract.
+  - [x] Build `embed_text`, persist it to PostgreSQL, then upsert vectors using `aspect_mentions.id` as the UUID primary key with scalar metadata.
+- [x] **Scheduling (APScheduler)**:
+  - [x] Implement the weekly orchestration in `backend/worker/jobs.py`.
+  - [x] Schedule the independent worker every Sunday at 02:00 UTC with single-instance/coalescing protection.
+- [x] **Basic Dashboard APIs**: Implement `GET /api/weeks`, `GET /api/overview`, and `GET /api/skus/{sku_code}/trends`.
+- [x] **First-batch acceptance**: Processed one selected document for each locked SKU in a controlled network environment; all five reached `embedded`, producing 10 PostgreSQL mentions and 10 matching Milvus vectors. Verified document status, evidence/quality/embed-text contracts, vector UUID metadata, and all three Dashboard APIs.
 
-## Week 3: Agentic RAG & Function Calling (The Core)
-- [ ] **Build Agent Tools (`backend/app/agent/`)**:
-  - [ ] `tool_report`: Fetch weekly markdown report (Highest priority for macro/summary queries).
-  - [ ] `tool_sql`: Query PostgreSQL for structured data, trends, counts, and competitor scores (Filtered by `capacity_tier`).
-  - [ ] `tool_rag`: Hybrid search in Milvus + PostgreSQL for specific user quotes and semantic aspects.
-- [ ] **Build Pure LLM Router (No LangChain/LlamaIndex)**:
-  - [ ] Write a pure Function Calling Loop (approx. 30 lines) supporting multi-turn tool calls.
-  - [ ] Implement System Prompt with strict routing priorities (1. Report -> 2. RAG -> 3. SQL).
-- [ ] **Implement `POST /api/ask` Endpoint**:
-  - [ ] Manage chat history in PostgreSQL `chat_messages` table (Store tool execution metadata in `tool_results` JSONB).
-  - [ ] Implement two-stage streaming: ① Tool execution loading state -> ② Final answer token streaming.
-  - [ ] Include cited `aspect_mentions` UUIDs in response.
-- [ ] **Auth**: Implement simple single-password + JWT auth in `core/security.py`.
+## Week 3: Agentic RAG & Function Calling (✅ Completed)
+- [x] **Controlled Agent tools**:
+  - [x] Read-only `tool_report` with explicit `not_found` and Router-owned fallback.
+  - [x] Deterministic `tool_sql` fixed operations with quality, dashboard, capacity-tier, and low-sample enforcement.
+  - [x] Structured `tool_rag` with Milvus/PostgreSQL provenance and used-evidence-only citations.
+- [x] **Pure handwritten LLM Router**:
+  - [x] Composable single/multi-tool function-calling loop without LangChain/LlamaIndex.
+  - [x] Hard three-call limit, no-data abstention, neutral comparison, and supported partial failures.
+- [x] **Conversation persistence**:
+  - [x] Reuse PostgreSQL `chat_sessions` and `chat_messages`.
+  - [x] Configurable recent-N context (default 8), no hidden active-filter state, compact tool metadata only.
+- [x] **`POST /api/ask` SSE endpoint**:
+  - [x] Real-time tool lifecycle events and final answer chunks.
+  - [x] Used citations only, stable completion identifiers, structured errors, and cancellation propagation.
+- [x] **Auth**: Configured single-password login, JWT verification, `/api/auth/me`, and protected `/api/ask`; dashboard routes remain public.
+- [x] **Reliability and Week 3 sign-off**:
+  - [x] Structured tool/LLM/RAG error categories, controlled partial failures, and duplicate/call-limit guards.
+  - [x] Deterministic 19-query smoke/golden acceptance set covering quantitative, qualitative, combined, follow-up, no-data, comparison, and fallback behavior.
+  - [x] Week 2 regression verification: processing states, embedding dimension, UUID provenance, dashboard APIs, shared quality threshold, and independent APScheduler worker.
+  - [x] Final documentation synchronization for the implemented controlled Agent design.
 
 ## Week 4: Frontend, Eval & Polish
 - [ ] **Next.js Frontend Development**:
