@@ -192,7 +192,7 @@ Final sign-off verification:
 - Failures while constructing FastAPI dependencies before the SSE generator starts can use normal FastAPI error handling rather than an SSE `error` event.
 - Concurrent requests for the same session can read the same pre-turn history. Persistence order is serialized, but semantic conflict resolution is not implemented.
 - Recent-N counts messages, not complete turns; an odd configured N can begin with an assistant message.
-- The current worktree is intentionally dirty/uncommitted. Do not discard or reset it. `uv.lock` is also untracked.
+- Week 3 implementation and documentation are committed locally and tagged `v0.3-week3`. The untracked `uv.lock` is intentionally excluded because no dependency declaration changed; it may be regenerated when dependency resolution is intentionally updated.
 - Documentation contains some older encoding artifacts in terminal rendering; files are UTF-8 and should be read explicitly as UTF-8 in PowerShell.
 
 ## Next Phase
