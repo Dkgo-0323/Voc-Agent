@@ -155,8 +155,11 @@ def _exact_excerpt(candidate: str, body: str) -> str | None:
 
 def _evidence_window(mention_text: str, body: str) -> str:
     start = body.find(mention_text)
-    left = max(0, start - MAX_CONTEXT_LENGTH // 2)
-    right = min(len(body), start + len(mention_text) + MAX_CONTEXT_LENGTH // 2)
+    surrounding_budget = max(0, MAX_CONTEXT_LENGTH - len(mention_text))
+    left_budget = surrounding_budget // 2
+    right_budget = surrounding_budget - left_budget
+    left = max(0, start - left_budget)
+    right = min(len(body), start + len(mention_text) + right_budget)
     return body[left:right]
 
 
@@ -432,6 +435,19 @@ class AspectExtractor:
             rejected_reasons: list[str] = []
             discarded_count = 0
             for index, raw_aspect in enumerate(extracted.aspects[:3]):
+                context_was_too_long = False
+                if isinstance(raw_aspect, dict):
+                    raw_aspect = raw_aspect.copy()
+                    context_window = raw_aspect.get("context_window")
+                    if (
+                        isinstance(context_window, str)
+                        and len(context_window) > MAX_CONTEXT_LENGTH
+                    ):
+                        # The model has already supplied a valid mention candidate.
+                        # Discard only its oversized context and rebuild bounded context
+                        # from that exact review excerpt after validation below.
+                        raw_aspect["context_window"] = None
+                        context_was_too_long = True
                 try:
                     aspect = ExtractedAspect.model_validate(raw_aspect)
                 except ValidationError as error:
@@ -461,6 +477,8 @@ class AspectExtractor:
                     )
                     continue
                 aspect.mention_text = exact_mention
+                if context_was_too_long:
+                    aspect.context_window = _evidence_window(exact_mention, body)
                 evidence_reason = _evidence_rejection_reason(aspect, body)
                 if evidence_reason is not None:
                     discarded_count += 1

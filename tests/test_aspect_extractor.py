@@ -13,6 +13,7 @@ from pipelines.enrichment.aspect_extractor import (
     AspectExtractor,
     ExtractionResponseError,
     PreparedDocument,
+    _evidence_window,
     build_aspect_mentions,
     detect_english,
     prepare_document,
@@ -111,6 +112,47 @@ def test_case_changed_excerpt_is_rejected() -> None:
 
     assert documents[0].aspects == []
     assert document.document_id in failures
+
+
+def test_evidence_window_never_exceeds_context_limit() -> None:
+    mention = "battery lasted for a full day while charging a laptop"
+    body = "x" * 300 + mention + "y" * 300
+
+    context = _evidence_window(mention, body)
+
+    assert mention in context
+    assert len(context) <= 200
+
+
+def test_overlong_model_context_is_rebuilt_from_exact_excerpt() -> None:
+    document = PreparedDocument(
+        document_id=uuid4(),
+        body="The battery lasted eight hours during the outage. " + "x" * 250,
+    )
+    payload = {
+        "documents": [
+            {
+                "document_id": str(document.document_id),
+                "aspects": [
+                    {
+                        "aspect_label": "battery_capacity",
+                        "sentiment": "positive",
+                        "confidence": 0.9,
+                        "mention_text": "battery lasted eight hours",
+                        "context_window": "x" * 201,
+                    }
+                ],
+            }
+        ]
+    }
+
+    documents, failures = AspectExtractor._validate_payload(payload, [document])
+
+    assert failures == {}
+    context = documents[0].aspects[0].context_window
+    assert context is not None
+    assert "battery lasted eight hours" in context
+    assert len(context) <= 200
 
 
 @pytest.mark.asyncio
