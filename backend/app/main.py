@@ -21,6 +21,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.sql import text
 
+from backend.app.api.ask import router as ask_router
+from backend.app.api.auth import router as auth_router
 from backend.app.api.dashboard import router as dashboard_router
 from backend.app.core.database import close_db, get_db_context, get_engine, init_db
 from backend.app.core.settings import settings
@@ -92,6 +94,8 @@ app.add_middleware(
 )
 
 app.include_router(dashboard_router)
+app.include_router(auth_router)
+app.include_router(ask_router)
 
 
 # ── 路由 ──────────────────────────────────────────────────────────────────────
