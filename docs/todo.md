@@ -64,7 +64,7 @@
   - [x] Deterministic analytics plus filtered RAG evidence, bounded LLM synthesis, and candidate validation.
   - [x] Transactional create/replacement that preserves a prior report on failure or cancellation.
 - [ ] **Evaluation System**:
-  - [ ] Write and validate the 50-query semantic Golden dataset.
+  - [x] Write and validate the 50-query semantic Golden dataset (Phase 11).
   - [ ] Implement and run the semantic evaluation framework (the planned `shared/eval/rag_eval.py` is not in this checkout).
   - [ ] Tweak system prompts and chunk retrieval numbers based on eval.
 - [ ] **Final Polish**:
