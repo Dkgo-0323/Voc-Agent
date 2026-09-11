@@ -40,7 +40,7 @@
     │   ├── ingestion/               # reddit_fetcher.py, amazon_loader.py
     │   ├── sanitize/                # pii_cleaner.py
     │   └── ...
-    ├── shared/                      # shared LLM client; semantic eval is planned for Week 4 Phase 12
+    ├── shared/                      # shared LLM client and Phase 12 semantic evaluation framework
     ├── frontend/                    # Next.js
     └── docker-compose.yml           # PostgreSQL + Milvus
 

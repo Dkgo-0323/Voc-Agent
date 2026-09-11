@@ -65,7 +65,7 @@
   - [x] Transactional create/replacement that preserves a prior report on failure or cancellation.
 - [ ] **Evaluation System**:
   - [x] Write and validate the 50-query semantic Golden dataset (Phase 11).
-  - [ ] Implement and run the semantic evaluation framework (the planned `shared/eval/rag_eval.py` is not in this checkout).
+  - [x] Implement the semantic evaluation framework with deterministic checks, structured LLM judge support, JSON output, and release gates (Phase 12).
   - [ ] Tweak system prompts and chunk retrieval numbers based on eval.
 - [ ] **Final Polish**:
   - [ ] Test Alembic migration on a fresh PostgreSQL instance.
