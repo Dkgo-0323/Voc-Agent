@@ -20,6 +20,10 @@ export function setApiAccessToken(token: string | null) {
   accessToken = token;
 }
 
+export function getApiAccessToken() {
+  return accessToken;
+}
+
 apiClient.interceptors.request.use((config) => {
   if (accessToken) {
     config.headers.Authorization = `Bearer ${accessToken}`;

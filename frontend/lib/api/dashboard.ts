@@ -92,6 +92,26 @@ export type EvidenceCitation = {
   };
 };
 
+export type ComparisonMetrics = {
+  sku_code: string;
+  review_count: number;
+  mention_count: number;
+  positive_count: number;
+  negative_count: number;
+  neutral_count: number;
+  positive_rate: number;
+  negative_rate: number;
+  neutral_rate: number;
+  sentiment_score: number;
+};
+
+export type ComparisonResponse = {
+  week_id: number | null;
+  capacity_tier: string;
+  skus: ComparisonMetrics[];
+  warnings: Array<{ code: string; message: string; details: Record<string, string | number | boolean | null> }>;
+};
+
 export async function fetchWeeks(): Promise<WeekOption[]> {
   const response = await publicApiClient.get<WeekOption[]>("/api/weeks");
   return response.data;
@@ -137,5 +157,16 @@ export async function fetchSkuEvidence(
     `/api/skus/${encodeURIComponent(skuCode)}/evidence`,
     { params: { week_id: weekId, sentiment, limit: 5 } },
   );
+  return response.data;
+}
+
+export async function fetchComparison(
+  skuA: string,
+  skuB: string,
+  weekId: number,
+): Promise<ComparisonResponse> {
+  const response = await publicApiClient.get<ComparisonResponse>("/api/compare", {
+    params: { sku_code: [skuA, skuB], week_id: weekId },
+  });
   return response.data;
 }
