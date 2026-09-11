@@ -4,6 +4,7 @@ import { BarChart3, ChevronRight, FileText, GitCompareArrows, MessageSquareText,
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import type { ReactNode } from "react";
+import { useAuth } from "@/components/auth/auth-context";
 
 const navigation = [
   { href: "/overview", label: "Overview", icon: BarChart3 },
@@ -19,6 +20,7 @@ function isActive(pathname: string, href: string) {
 
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
+  const { logout, user } = useAuth();
 
   return (
     <div className="min-h-screen lg:grid lg:grid-cols-[15.5rem_minmax(0,1fr)]">
@@ -28,7 +30,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             <span className="grid size-9 place-items-center rounded-xl bg-[var(--brand)] text-sm font-bold text-white">V</span>
             <span><span className="block text-sm font-semibold tracking-tight">VOC Intelligence</span><span className="block text-xs text-[var(--ink-muted)]">Weekly signal desk</span></span>
           </Link>
-          <Link href="/login" className="text-xs font-medium text-[var(--ink-muted)] lg:hidden">Session</Link>
+          <button type="button" onClick={logout} className="text-xs font-medium text-[var(--ink-muted)] lg:hidden">Sign out</button>
         </div>
         <nav aria-label="Primary navigation" className="overflow-x-auto px-3 pb-3 lg:px-4 lg:pb-0">
           <ul className="flex min-w-max gap-1 lg:block lg:space-y-1">
@@ -38,7 +40,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             })}
           </ul>
         </nav>
-        <div className="hidden px-6 pt-8 lg:block"><div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Foundation</p><p className="mt-2 text-sm leading-5 text-[var(--ink-muted)]">Shared navigation, states, API client, and route shells are ready.</p><Link href="/login" className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--brand)]">Session setup <ChevronRight size={15} /></Link></div></div>
+        <div className="hidden px-6 pt-8 lg:block"><div className="rounded-xl border border-[var(--line)] bg-[var(--canvas)] p-4"><p className="text-xs font-semibold uppercase tracking-[0.14em] text-[var(--ink-muted)]">Signed in</p><p className="mt-2 text-sm leading-5 text-[var(--ink-muted)]">{user?.subject ?? "Session verified"}</p><button type="button" onClick={logout} className="mt-3 inline-flex items-center gap-1 text-sm font-semibold text-[var(--brand)]">Sign out <ChevronRight size={15} /></button></div></div>
       </aside>
       <main className="min-w-0">{children}</main>
     </div>
