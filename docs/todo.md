@@ -51,6 +51,7 @@
   - [x] Deterministic 19-query smoke/golden acceptance set covering quantitative, qualitative, combined, follow-up, no-data, comparison, and fallback behavior.
   - [x] Week 2 regression verification: processing states, embedding dimension, UUID provenance, dashboard APIs, shared quality threshold, and independent APScheduler worker.
   - [x] Final documentation synchronization for the implemented controlled Agent design.
+  - [x] Live authenticated RAG E2E verification with the configured Zhipu LLM and embedding provider, Milvus retrieval, PostgreSQL evidence hydration, SSE citation, and `done:success`.
 
 ## Week 4: Frontend, Eval & Polish
 - [ ] **Next.js Frontend Development**:

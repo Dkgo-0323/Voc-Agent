@@ -1,7 +1,7 @@
 # Architecture & Key Decisions (VOC Agent MVP)
 
 ## 0. Scope & Upgrades
-- **Target**: Outdoor power stations VOC weekly intelligence with a controlled multi-turn analytical Agent. Week 3 is signed off: minimal JWT authentication, structured Agent streaming, and the deterministic 19-query smoke/golden acceptance set are complete.
+- **Target**: Outdoor power stations VOC weekly intelligence with a controlled multi-turn analytical Agent. Week 3 is signed off: minimal JWT authentication, structured Agent streaming, the deterministic 19-query smoke/golden acceptance set, and a live Zhipu + embedding provider + Milvus + PostgreSQL RAG verification are complete.
 - **Core Stack**: Python 3.11+, `uv`, FastAPI (Async), SQLAlchemy 2.0 (asyncio), PostgreSQL 15, Milvus 2.x.
 - **Major Upgrades from v1**:
   - Completely abandoned SQLite to avoid Alembic migration incompatibilities with JSONB/ARRAY types.
@@ -82,7 +82,8 @@ The LLM may interpret intent, regenerate explicit tool arguments from visible re
 
 - The deterministic 19-query smoke/golden set covers quantitative, trend, same-tier and cross-tier comparison, evidence, combined SQL+RAG, recent-message follow-up, no-data, and fallback behavior.
 - The final Week 3 regression run preserves the validated Week 2 processing pipeline, embedding dimension contract, PostgreSQL/Milvus UUID alignment, dashboard APIs, shared quality filtering, and independent APScheduler worker process.
-- This sign-off does not claim a live external LLM/Milvus/PostgreSQL end-to-end run; those services remain a deployment-validation concern.
+- Live end-to-end validation passed against the configured Zhipu LLM and embedding provider with local Milvus and PostgreSQL: an authenticated `POST /api/ask` RAG request returned HTTP 200, `tool_rag:success`, one grounded SSE citation, and `done:success`.
+- The live citation's `mention_id` was verified as an `aspect_mentions.id` whose `document_id` matched the cited `documents.id`; its source URL and evidence preview were present. The request executed one tool call, within the maximum of three.
 
 ## 5. Storage & Schema Contracts
 
