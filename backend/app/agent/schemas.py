@@ -458,3 +458,54 @@ StreamingEvent = Annotated[
 
 
 streaming_event_adapter = TypeAdapter(StreamingEvent)
+
+
+class ReportStartedEvent(AgentSchema):
+    event_type: Literal["report_started"] = "report_started"
+    sku_code: str = Field(min_length=1)
+    week_id: int = Field(ge=1)
+
+
+class ReportStageStartedEvent(AgentSchema):
+    event_type: Literal["stage_started"] = "stage_started"
+    stage: Literal[
+        "collecting_analytics",
+        "retrieving_evidence",
+        "synthesizing",
+        "validating",
+        "persisting",
+    ]
+
+
+class ReportStageCompletedEvent(ReportStageStartedEvent):
+    event_type: Literal["stage_completed"] = "stage_completed"
+    warnings: list[str] = Field(default_factory=list)
+
+
+class ReportDeltaEvent(AgentSchema):
+    event_type: Literal["report_delta"] = "report_delta"
+    delta: str = Field(min_length=1)
+
+
+class ReportCompletedEvent(AgentSchema):
+    event_type: Literal["report_completed"] = "report_completed"
+    report: WeeklyReportPayload
+
+
+class ReportErrorEvent(AgentSchema):
+    event_type: Literal["error"] = "error"
+    error: ToolError
+
+
+ReportStreamingEvent = Annotated[
+    ReportStartedEvent
+    | ReportStageStartedEvent
+    | ReportStageCompletedEvent
+    | ReportDeltaEvent
+    | ReportCompletedEvent
+    | ReportErrorEvent,
+    Field(discriminator="event_type"),
+]
+
+
+report_streaming_event_adapter = TypeAdapter(ReportStreamingEvent)

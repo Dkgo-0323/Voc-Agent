@@ -81,7 +81,7 @@ report-generation write contract remains deferred to a later phase.
 | `GET /api/skus/{sku_code}/evidence?week_id=YYYYWW&sentiment=positive|negative|neutral&limit=1..20` | **Implemented.** Evidence cards for SKU Detail and Compare. | `AnswerCitation[]`, selected only from dashboard-enabled, quality-qualified mentions. Ordering is quality descending, then persisted mention creation time descending, then mention ID. `representative` remains a UI label, not a stored field or an LLM judgment. |
 | `GET /api/compare?sku_code=<code>&sku_code=<code>[&week_id=YYYYWW]` | **Implemented.** Deterministic same-tier comparison. | `{ week_id, capacity_tier, skus, warnings }`, where each `skus` item is the existing neutral `SkuComparisonMetrics` count/rate/score model. The server validates at least two enabled SKUs, a valid ISO week when provided, and one non-null shared capacity tier. `capacity_tier_mismatch` and `capacity_tier_unavailable` are `400` responses with `{ detail: { code, message, retryable, details } }`. No winner/better field. |
 | `GET /api/reports/{week_id}?sku_code=<code>` | **Implemented.** Read a stored report for one locked, dashboard-enabled SKU and ISO week. | The current `WeeklyReportPayload` shape: `report_id`, `sku_code`, `week_id`, nullable `report_md`, nullable `summary`, and `generated_at`. Invalid scope is a structured `400`; missing report is `404`; it never fabricates a report. |
-| `POST /api/reports/generate` | Create a candidate report or atomically replace the report for one locked, dashboard-enabled SKU/week. Request: `{ "sku_code": string, "week_id": integer }`. | `text/event-stream` with the lifecycle below. A separate `regenerate` flag is deliberately unnecessary: the same request creates when absent and replaces only after a successful validated candidate. |
+| `POST /api/reports/generate` | **Implemented in Phase 7.** Authenticated create or atomic replacement for one locked, dashboard-enabled SKU/week. Request: `{ "sku_code": string, "week_id": integer }`. | `text/event-stream` with the lifecycle below. A separate `regenerate` flag is deliberately unnecessary: the same request creates when absent and replaces only after a successful validated candidate. |
 
 The request-level error envelope for new streaming APIs must reuse the existing
 safe shape: `{ "event_type": "error", "error": { "code", "message",
@@ -161,8 +161,9 @@ No `report_completed` is sent before the successful commit.
 
 ## Report-generation SSE lifecycle
 
-The report stream will be new. It reuses SSE framing and the safe error envelope
-from `/api/ask`, but uses its own discriminated `event_type` values:
+The report stream is implemented at authenticated `POST /api/reports/generate`.
+It reuses SSE framing and the safe error envelope from `/api/ask`, but uses its
+own discriminated `event_type` values:
 
 1. `report_started` — emitted once after request validation and before work;
    carries `sku_code` and `week_id` only.
@@ -180,6 +181,9 @@ from `/api/ask`, but uses its own discriminated `event_type` values:
 
 No event follows either terminal event. Cancellation follows the existing ask
 behavior: cancel in-flight work where possible and roll back uncommitted writes.
+The current provider adapter is completion-based, so `report_delta` contains
+ordered chunks after a fully validated candidate is available; it is explicitly
+display progress rather than provider-token streaming or proof of persistence.
 
 ## Authentication and session behavior
 

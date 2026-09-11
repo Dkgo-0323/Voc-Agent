@@ -57,6 +57,10 @@
 - [ ] **Next.js Frontend Development**:
   - [x] Product foundation, JWT session flow, Overview, Level 2 SKU Detail, and same-tier Compare (Phases 1–6).
   - [ ] Weekly Report viewer/generation and Ask Your Data browser workspace (Phases 7–9).
+- [x] **Weekly Report Backend (Phase 7)**:
+  - [x] Authenticated `POST /api/reports/generate` SSE lifecycle with safe errors.
+  - [x] Deterministic analytics plus filtered RAG evidence, bounded LLM synthesis, and candidate validation.
+  - [x] Transactional create/replacement that preserves a prior report on failure or cancellation.
 - [ ] **Evaluation System**:
   - [ ] Write and validate the 50-query semantic Golden dataset.
   - [ ] Implement and run the semantic evaluation framework (the planned `shared/eval/rag_eval.py` is not in this checkout).
