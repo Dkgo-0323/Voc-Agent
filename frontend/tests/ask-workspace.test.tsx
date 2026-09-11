@@ -90,4 +90,22 @@ describe("AskWorkspace", () => {
 
     expect(await screen.findByText("Authentication is required.")).toBeInTheDocument();
   });
+
+  it("shows a retryable safe error when the answer stream ends without a terminal event", async () => {
+    askApi.streamAsk.mockResolvedValue(undefined);
+    render(<AskWorkspace />);
+    ask("What happened to the stream?");
+
+    expect(await screen.findByText("The response stream ended before an answer was completed. Please try again.")).toBeInTheDocument();
+  });
+
+  it("does not treat an error completion status as a successful answer", async () => {
+    askApi.streamAsk.mockImplementation(async (_message: string, onEvent: (event: unknown) => void) => {
+      onEvent({ event_type: "done", session_id: "session-1", status: "error" });
+    });
+    render(<AskWorkspace />);
+    ask("Can this complete with an error?");
+
+    expect(await screen.findByText("The response could not be completed. Please try again.")).toBeInTheDocument();
+  });
 });

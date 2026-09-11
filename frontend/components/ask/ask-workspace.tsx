@@ -48,7 +48,7 @@ function CitationPopover({ citation, number }: { citation: EvidenceCitation; num
   return (
     <span className="relative inline-block">
       <button type="button" aria-label={`Open citation ${number}`} aria-expanded={open} onClick={() => setOpen((current) => !current)} className="ml-1 rounded px-1.5 py-0.5 text-xs font-bold text-[var(--brand-strong)] hover:bg-[var(--brand-soft)]">[{number}]</button>
-      {open ? <div role="dialog" aria-label={`Citation ${number}`} className="absolute bottom-full left-0 z-10 mb-2 w-80 rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 text-left shadow-lg"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--brand)]">Citation {number}</p><blockquote className="mt-2 text-sm leading-6 text-[var(--ink)]">“{citation.evidence_preview}”</blockquote><p className="mt-3 text-xs text-[var(--ink-muted)]">{citation.source.platform} · {citation.sku_code} · Week {citation.week_id}</p>{citation.source.title ? <p className="mt-2 text-xs text-[var(--ink-muted)]">{citation.source.title}</p> : null}{citation.source.source_url ? <a href={citation.source.source_url} target="_blank" rel="noreferrer" className="mt-3 inline-block text-xs font-semibold text-[var(--brand-strong)]">Open original source</a> : null}</div> : null}
+      {open ? <div role="dialog" aria-label={`Citation ${number}`} className="absolute bottom-full right-0 z-10 mb-2 w-[min(20rem,calc(100vw-2.5rem))] rounded-xl border border-[var(--line)] bg-[var(--surface)] p-4 text-left shadow-lg"><p className="text-xs font-semibold uppercase tracking-[0.12em] text-[var(--brand)]">Citation {number}</p><blockquote className="mt-2 break-words text-sm leading-6 text-[var(--ink)]">“{citation.evidence_preview}”</blockquote><p className="mt-3 break-words text-xs text-[var(--ink-muted)]">{citation.source.platform} · {citation.sku_code} · Week {citation.week_id}</p>{citation.source.title ? <p className="mt-2 break-words text-xs text-[var(--ink-muted)]">{citation.source.title}</p> : null}{citation.source.source_url ? <a href={citation.source.source_url} target="_blank" rel="noreferrer" className="mt-3 inline-block break-all text-xs font-semibold text-[var(--brand-strong)]">Open original source</a> : null}</div> : null}
     </span>
   );
 }
@@ -88,6 +88,7 @@ export function AskWorkspace() {
     setDraft("");
     setMessages((current) => [...current, { id: `${requestId}:user`, role: "user", content, citations: [] }, { id: requestId, role: "assistant", content: "", citations: [], status: "working", progress: "Preparing your request…" }]);
     let streamError = "";
+    let terminalEventReceived = false;
     try {
       await streamAsk(content, (event: AskStreamEvent) => {
         if (event.event_type === "tool_started") updateAssistant(requestId, (message) => ({ ...message, progress: toolLabels[event.tool_name] ?? "Preparing a grounded response…" }));
@@ -95,12 +96,17 @@ export function AskWorkspace() {
         if (event.event_type === "answer_delta") updateAssistant(requestId, (message) => ({ ...message, content: message.content + event.delta, progress: "Preparing the final response…" }));
         if (event.event_type === "citation") updateAssistant(requestId, (message) => ({ ...message, citations: message.citations.some((citation) => citation.mention_id === event.citation.mention_id) ? message.citations : [...message.citations, event.citation] }));
         if (event.event_type === "done") {
+          terminalEventReceived = true;
           if (event.session_id) setSessionId(event.session_id);
-          updateAssistant(requestId, (message) => ({ ...message, status: event.status === "abstained" ? "abstained" : "complete", progress: undefined }));
+          if (event.status === "error") streamError = "The response could not be completed. Please try again.";
+          else updateAssistant(requestId, (message) => ({ ...message, status: event.status === "abstained" ? "abstained" : "complete", progress: undefined }));
         }
-        if (event.event_type === "error") streamError = event.error.message;
+        if (event.event_type === "error") {
+          terminalEventReceived = true;
+          streamError = event.error.message;
+        }
       }, { sessionId, signal: controller.signal });
-      if (streamError) updateAssistant(requestId, (message) => ({ ...message, status: "error", error: streamError, progress: undefined }));
+      if (streamError || !terminalEventReceived) updateAssistant(requestId, (message) => ({ ...message, status: "error", error: streamError || "The response stream ended before an answer was completed. Please try again.", progress: undefined }));
     } catch (caught) {
       if (controller.signal.aborted) updateAssistant(requestId, (message) => ({ ...message, status: "cancelled", progress: undefined }));
       else updateAssistant(requestId, (message) => ({ ...message, status: "error", error: toApiError(caught).message, progress: undefined }));

@@ -44,7 +44,7 @@ describe("ReportDashboard", () => {
 
     expect(await screen.findByText("No report has been generated")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: "Generate report" }));
-    await waitFor(() => expect(reportsApi.streamReportGeneration).toHaveBeenCalledWith({ sku_code: "ecoflow-delta2", week_id: 202403 }, expect.any(Function)));
+    await waitFor(() => expect(reportsApi.streamReportGeneration).toHaveBeenCalledWith({ sku_code: "ecoflow-delta2", week_id: 202403 }, expect.any(Function), expect.objectContaining({ signal: expect.any(AbortSignal) })));
     expect(await screen.findByText("A persisted summary from the weekly report.")).toBeInTheDocument();
     expect(screen.queryByText("uncommitted candidate")).not.toBeInTheDocument();
   });
@@ -61,5 +61,27 @@ describe("ReportDashboard", () => {
     expect(await screen.findByText("Report generation did not complete")).toBeInTheDocument();
     expect(screen.getByText("A persisted summary from the weekly report.")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Retry generation" })).toBeInTheDocument();
+  });
+
+  it("keeps an existing report visible when a generation stream is stopped", async () => {
+    reportsApi.streamReportGeneration.mockImplementation((_payload: unknown, _onEvent: unknown, options: { signal: AbortSignal }) => new Promise((_, reject) => options.signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))));
+    renderDashboard();
+    await screen.findByText("A persisted summary from the weekly report.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate report" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Stop generation" }));
+
+    expect(await screen.findByText("Report generation was stopped. The saved report was not changed.")).toBeInTheDocument();
+    expect(screen.getByText("A persisted summary from the weekly report.")).toBeInTheDocument();
+  });
+
+  it("reports a disconnected generation stream instead of treating it as success", async () => {
+    reportsApi.streamReportGeneration.mockResolvedValue(undefined);
+    renderDashboard();
+    await screen.findByText("A persisted summary from the weekly report.");
+
+    fireEvent.click(screen.getByRole("button", { name: "Regenerate report" }));
+
+    expect(await screen.findByText("The report stream ended before the report was saved. Please try again.")).toBeInTheDocument();
   });
 });

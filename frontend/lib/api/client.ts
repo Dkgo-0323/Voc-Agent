@@ -53,7 +53,11 @@ export type ApiError = { message: string; status?: number };
 export function toApiError(error: unknown): ApiError {
   if (error instanceof AxiosError) {
     const detail = error.response?.data?.detail;
-    return { message: typeof detail === "string" ? detail : "The request could not be completed.", status: error.response?.status };
+    const status = error.response?.status;
+    return {
+      message: status && status < 500 && typeof detail === "string" ? detail : "The request could not be completed.",
+      status,
+    };
   }
   if (
     typeof error === "object" &&

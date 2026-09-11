@@ -17,6 +17,8 @@ export type ReportStreamEvent =
   | { event_type: "report_completed"; report: WeeklyReport }
   | { event_type: "error"; error: { code: string; message: string; retryable: boolean } };
 
+export type ReportStreamOptions = { signal?: AbortSignal };
+
 export async function fetchWeeklyReport(skuCode: string, weekId: number): Promise<WeeklyReport> {
   const response = await publicApiClient.get<WeeklyReport>(`/api/reports/${weekId}`, {
     params: { sku_code: skuCode },
@@ -39,6 +41,7 @@ function emitSseRecords(buffer: string, onEvent: (event: ReportStreamEvent) => v
 export async function streamReportGeneration(
   payload: { sku_code: string; week_id: number },
   onEvent: (event: ReportStreamEvent) => void,
+  options: ReportStreamOptions = {},
 ) {
   const token = getApiAccessToken();
   if (!token) {
@@ -48,6 +51,7 @@ export async function streamReportGeneration(
     method: "POST",
     headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", Accept: "text/event-stream" },
     body: JSON.stringify(payload),
+    signal: options.signal,
   });
   if (!response.ok || !response.body) {
     if (response.status === 401 && typeof window !== "undefined") {
