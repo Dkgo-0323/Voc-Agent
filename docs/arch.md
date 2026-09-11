@@ -112,7 +112,7 @@ The LLM may interpret intent, regenerate explicit tool arguments from visible re
   - `chat_messages` stores `tool_calls` and `tool_results` as JSONB.
   - *Decision*: `tool_results` only stores execution metadata (count/time), NOT the raw data payload, to save DB space and keep debugging clean.
 
-## 6. Week 4 Product Surfaces (Phases 0–9)
+## 6. Week 4 Product Surfaces (Phases 0–10)
 
 - The Next.js app uses TanStack Query for dashboard server state, React Context for JWT session state, and local component state for visible filters and streamed content. Redux/Zustand were not added.
 - `/overview` consumes only public `GET /api/weeks`, `GET /api/overview`, and `GET /api/skus`. It does not calculate new business metrics or fabricate the unavailable portfolio-movement metric.
