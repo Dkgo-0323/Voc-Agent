@@ -1,0 +1,6 @@
+import { LockKeyhole } from "lucide-react";
+import Link from "next/link";
+
+export default function LoginPage() {
+  return <main className="grid min-h-screen place-items-center px-5 py-10"><section className="w-full max-w-md rounded-2xl border border-[var(--line)] bg-[var(--surface)] p-7 shadow-[var(--shadow)] sm:p-9"><div className="grid size-11 place-items-center rounded-xl bg-[var(--brand-soft)] text-[var(--brand)]"><LockKeyhole size={21} /></div><p className="mt-6 text-xs font-semibold uppercase tracking-[0.15em] text-[var(--brand)]">VOC Intelligence</p><h1 className="mt-2 text-3xl font-semibold tracking-tight">Session access</h1><p className="mt-3 text-sm leading-6 text-[var(--ink-muted)]">The configured-password sign-in flow is wired to the shared API client in the next authentication phase.</p><div className="mt-7 rounded-xl border border-dashed border-[var(--line)] bg-[var(--canvas)] p-4 text-sm leading-6 text-[var(--ink-muted)]">This foundation intentionally does not submit credentials or persist a token yet.</div><Link href="/overview" className="mt-7 inline-flex w-full items-center justify-center rounded-lg bg-[var(--brand)] px-4 py-3 text-sm font-semibold text-white hover:bg-[var(--brand-strong)]">View application shell</Link></section></main>;
+}
