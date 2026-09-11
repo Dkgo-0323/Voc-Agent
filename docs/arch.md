@@ -112,7 +112,7 @@ The LLM may interpret intent, regenerate explicit tool arguments from visible re
   - `chat_messages` stores `tool_calls` and `tool_results` as JSONB.
   - *Decision*: `tool_results` only stores execution metadata (count/time), NOT the raw data payload, to save DB space and keep debugging clean.
 
-## 6. Week 4 Product Surfaces (Phases 0–7)
+## 6. Week 4 Product Surfaces (Phases 0–8)
 
 - The Next.js app uses TanStack Query for dashboard server state, React Context for JWT session state, and local component state for visible filters and streamed content. Redux/Zustand were not added.
 - `/overview` consumes only public `GET /api/weeks`, `GET /api/overview`, and `GET /api/skus`. It does not calculate new business metrics or fabricate the unavailable portfolio-movement metric.
@@ -123,6 +123,7 @@ The LLM may interpret intent, regenerate explicit tool arguments from visible re
 - Phases 0–6 introduced no migrations, persistence-model changes, or new backend routes. Phase 7 adds authenticated `POST /api/reports/generate`: deterministic analytics and filtered RAG evidence are passed to a bounded report writer; the candidate is validated and only then inserted or atomically replaces the existing `(sku_id, week_id)` row. Failed generation, validation, persistence, or cancellation rolls back and leaves a prior report intact.
 - Report generation SSE emits `report_started`, stage lifecycle events, ordered candidate `report_delta` chunks, then `report_completed` only after commit; safe terminal `error` events never expose provider text or stack traces. The provider adapter remains completion-based, so candidate chunks are not provider-token streaming.
 - `weekly_reports` still has no durable report-to-mention relation. Report generation can use retrieved evidence for synthesis, but report-level interactive citations are not exposed or invented.
+- `/reports` retrieves an existing report for an explicit SKU/week and never generates on page load or refresh. Its Generate/Regenerate action consumes only the safe report SSE lifecycle, translates stages into user-facing progress, and replaces the visible report only after `report_completed`. Candidate deltas are never presented as persisted content; failed regeneration keeps the prior report visible.
 
 ## 7. Flowchart
 
