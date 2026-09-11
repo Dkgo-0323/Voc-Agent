@@ -57,7 +57,7 @@
 - [ ] **Next.js Frontend Development**:
   - [x] Product foundation, JWT session flow, Overview, Level 2 SKU Detail, and same-tier Compare (Phases 1–6).
   - [x] Weekly Report viewer and explicit streamed generation (Phase 8).
-  - [ ] Ask Your Data browser workspace (Phase 9).
+  - [x] Ask Your Data browser workspace (Phase 9).
 - [x] **Weekly Report Backend (Phase 7)**:
   - [x] Authenticated `POST /api/reports/generate` SSE lifecycle with safe errors.
   - [x] Deterministic analytics plus filtered RAG evidence, bounded LLM synthesis, and candidate validation.
