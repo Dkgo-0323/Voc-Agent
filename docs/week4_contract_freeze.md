@@ -69,18 +69,18 @@ All JSON models reject unknown fields where the current Pydantic model declares
 
 ### Required Week 4 additions
 
-These are dedicated read/write contracts needed by planned pages. They are
-**not implemented** at Phase 0. Field names below are constrained to currently
-stored values or already-existing Agent models; each endpoint needs tests before
-it is introduced.
+These are dedicated read/write contracts needed by planned pages. Phase 3
+implements the read-only entries marked **implemented** below. Field names are
+constrained to currently stored values or already-existing Agent models; the
+report-generation write contract remains deferred to a later phase.
 
 | Endpoint | Purpose and minimum request | Frozen response / behavior |
 |---|---|---|
-| `GET /api/skus` | List dashboard-enabled SKUs for navigation and valid comparison choices. No request body. | `SkuMetadata[]`: `sku_code`, `brand`, `model`, `capacity_wh`, `capacity_tier`, `is_competitor`, `dashboard_enabled`. Reuse the existing repository model; do not expose disabled SKUs. |
-| `GET /api/skus/{sku_code}?week_id=YYYYWW` | SKU Detail summary for one existing dashboard week. | A new read model composed from existing aggregates: SKU metadata; selected `week_id`; `review_count`, `mention_count`; positive/negative/neutral counts; top aspect buckets; and no synthetic movement/recommendation fields. It must reject an unknown/disabled SKU and a week with no scoped data. |
-| `GET /api/skus/{sku_code}/evidence?week_id=YYYYWW&sentiment=positive|negative&limit=1..N` | Evidence cards for SKU Detail. | A list of the shared `EvidenceViewModel`. It must select only dashboard-enabled, quality-qualified mentions, apply the requested sentiment/week, preserve the mention-to-document provenance, and document deterministic ordering in its implementation. `representative` is a UI label, not a stored field or an LLM judgment. |
-| `GET /api/compare?sku_code=<code>&sku_code=<code>[&week_id=YYYYWW]` | Deterministic same-tier comparison. | A read model based on the existing comparison, aspect-distribution, trend, and evidence data. It must validate all requested codes before querying, require at least two enabled SKUs with the same non-null `capacity_tier`, return neutral metrics, and surface `capacity_tier_mismatch` or `capacity_tier_unavailable` as a structured client error. No winner/better field. |
-| `GET /api/reports/{week_id}?sku_code=<code>` | Read a stored report for one locked, dashboard-enabled SKU and ISO week. | The current `WeeklyReportPayload` shape: `report_id`, `sku_code`, `week_id`, nullable `report_md`, nullable `summary`, and `generated_at`. Missing report is a typed/not-found response; it must not fabricate a report. |
+| `GET /api/skus` | **Implemented.** List dashboard-enabled SKUs for navigation and valid comparison choices. No request body. | `SkuMetadataResponse[]`: `sku_code`, `brand`, `model`, `capacity_wh`, `capacity_tier`, `is_competitor`, `dashboard_enabled`. Disabled SKUs are not exposed. |
+| `GET /api/skus/{sku_code}?week_id=YYYYWW` | **Implemented.** SKU Detail summary for one existing dashboard week. | SKU metadata; `week_id`; `review_count`, `mention_count`; `sentiment_breakdown` with positive/negative/neutral counts; and `top_aspects` with `aspect_label`, `mention_count`, `positive_rate`. It rejects unknown/disabled SKUs (`400`) and weeks with no scoped dashboard data (`404`). |
+| `GET /api/skus/{sku_code}/evidence?week_id=YYYYWW&sentiment=positive|negative|neutral&limit=1..20` | **Implemented.** Evidence cards for SKU Detail and Compare. | `AnswerCitation[]`, selected only from dashboard-enabled, quality-qualified mentions. Ordering is quality descending, then persisted mention creation time descending, then mention ID. `representative` remains a UI label, not a stored field or an LLM judgment. |
+| `GET /api/compare?sku_code=<code>&sku_code=<code>[&week_id=YYYYWW]` | **Implemented.** Deterministic same-tier comparison. | `{ week_id, capacity_tier, skus, warnings }`, where each `skus` item is the existing neutral `SkuComparisonMetrics` count/rate/score model. The server validates at least two enabled SKUs, a valid ISO week when provided, and one non-null shared capacity tier. `capacity_tier_mismatch` and `capacity_tier_unavailable` are `400` responses with `{ detail: { code, message, retryable, details } }`. No winner/better field. |
+| `GET /api/reports/{week_id}?sku_code=<code>` | **Implemented.** Read a stored report for one locked, dashboard-enabled SKU and ISO week. | The current `WeeklyReportPayload` shape: `report_id`, `sku_code`, `week_id`, nullable `report_md`, nullable `summary`, and `generated_at`. Invalid scope is a structured `400`; missing report is `404`; it never fabricates a report. |
 | `POST /api/reports/generate` | Create a candidate report or atomically replace the report for one locked, dashboard-enabled SKU/week. Request: `{ "sku_code": string, "week_id": integer }`. | `text/event-stream` with the lifecycle below. A separate `regenerate` flag is deliberately unnecessary: the same request creates when absent and replaces only after a successful validated candidate. |
 
 The request-level error envelope for new streaming APIs must reuse the existing
@@ -98,8 +98,8 @@ models with fields absent from their backend response.
 | `WeekOption` | `WeekResponse` | `week_id`, `week_start`, `week_end`, `doc_count`, `mention_count`, `skus_covered`. |
 | `OverviewViewModel` | `OverviewResponse` | selected `week_id`, total mentions, sentiment counts, top aspects, and SKU ranking rows. No portfolio-movement field exists yet. |
 | `SkuNavigationItem` | `SkuMetadata` | code, brand, model, optional capacity Wh/tier, competitor and enabled flags. |
-| `SkuDetailViewModel` | planned SKU detail + trends + evidence | metadata, selected week, count/distribution data, trend points, and positive/negative `EvidenceViewModel[]`. The current trends endpoint alone does not provide all detail data. |
-| `ComparisonViewModel` | planned comparison response | requested SKU metadata, shared tier, neutral per-SKU counts/rates/score, aspects/trends/evidence, warnings, and a validation error state. It has no `winner`. |
+| `SkuDetailViewModel` | `SkuDetailResponse` + existing trends + `AnswerCitation[]` evidence | metadata, selected week, count/distribution data, trend points, and positive/negative evidence lists. The current trends endpoint alone does not provide all detail data. |
+| `ComparisonViewModel` | `ComparisonResponse` + `SkuMetadataResponse[]` + `AnswerCitation[]` evidence | requested SKU metadata, shared tier, neutral per-SKU counts/rates/score, warnings, and a validation error state. Aspects/trends are not included in `ComparisonResponse`; a later frontend phase may compose only existing scoped endpoints. It has no `winner`. |
 | `WeeklyReportViewModel` | `WeeklyReportPayload` | `report_id`, SKU, week, nullable Markdown, nullable summary, `generated_at`. Absence is a distinct not-found/empty state. |
 | `AskStreamViewModel` | `AskRequest` and current `StreamingEvent` union | local draft, optional `session_id`, accumulating answer Markdown, lifecycle status, used citations, terminal status/error, and stable session/user/assistant IDs from `done`. |
 | `ReportGenerationStreamViewModel` | planned report SSE union | SKU/week, ordered stages, accumulating Markdown candidate, terminal report metadata, and terminal error. It must not treat deltas as persisted before `report_completed`. |

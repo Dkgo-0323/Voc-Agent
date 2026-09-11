@@ -7,10 +7,11 @@ from sqlalchemy import case, func, insert, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.core.settings import settings
-from backend.app.db.models import AspectMention, Sku
+from backend.app.db.models import AspectMention, Document, Sku
 from backend.app.db.repositories.schemas import (
     AspectMentionCreate,
     AspectMentionRead,
+    RetrievedEvidenceRow,
     SkuMetadata,
     SkuRanking,
     SkuTrend,
@@ -265,6 +266,83 @@ class AspectRepository:
             select(Sku).where(Sku.dashboard_enabled.is_(True)).order_by(Sku.sku_code)
         )
         return [SkuMetadata.model_validate(sku) for sku in result.scalars()]
+
+    async def get_sku_week_summary(
+        self,
+        *,
+        sku_code: str,
+        week_id: int,
+        quality_threshold: float | None = settings.aspect_quality_threshold,
+    ) -> tuple[int, int]:
+        """Return quality-qualified review and mention counts for one SKU/week."""
+        statement = (
+            select(
+                func.count(func.distinct(AspectMention.document_id)).label(
+                    "review_count"
+                ),
+                func.count(AspectMention.id).label("mention_count"),
+            )
+            .join(Sku, Sku.sku_code == AspectMention.sku_code)
+            .where(
+                AspectMention.sku_code == sku_code,
+                AspectMention.week_id == week_id,
+                Sku.dashboard_enabled.is_(True),
+            )
+        )
+        statement = self._with_quality_threshold(statement, quality_threshold)
+        row = (await self._session.execute(statement)).one()
+        return int(row.review_count or 0), int(row.mention_count or 0)
+
+    async def get_sku_evidence(
+        self,
+        *,
+        sku_code: str,
+        week_id: int,
+        sentiment: str,
+        limit: int,
+        quality_threshold: float | None = settings.aspect_quality_threshold,
+    ) -> list[RetrievedEvidenceRow]:
+        """Return provenance-complete evidence in a stable display order.
+
+        Quality score descending, then newest persisted mention, then mention ID
+        makes repeated requests deterministic when quality scores tie.
+        """
+        statement = (
+            select(
+                AspectMention.id.label("mention_id"),
+                AspectMention.document_id,
+                AspectMention.sku_code,
+                AspectMention.aspect_label,
+                AspectMention.sentiment,
+                AspectMention.mention_text,
+                AspectMention.context_window,
+                AspectMention.quality_score,
+                AspectMention.week_id,
+                Document.platform,
+                Document.published_at,
+                Document.source_url,
+                Document.title,
+                Document.rating,
+                Document.body.label("review_text"),
+            )
+            .join(Document, Document.id == AspectMention.document_id)
+            .join(Sku, Sku.sku_code == AspectMention.sku_code)
+            .where(
+                AspectMention.sku_code == sku_code,
+                AspectMention.week_id == week_id,
+                AspectMention.sentiment == sentiment,
+                Sku.dashboard_enabled.is_(True),
+            )
+            .order_by(
+                AspectMention.quality_score.desc(),
+                AspectMention.created_at.desc(),
+                AspectMention.id,
+            )
+            .limit(limit)
+        )
+        statement = self._with_quality_threshold(statement, quality_threshold)
+        rows = await self._session.execute(statement)
+        return [RetrievedEvidenceRow.model_validate(row._mapping) for row in rows]
 
     async def validate_locked_skus(self, locked_sku_codes: set[str]) -> None:
         result = await self._session.execute(

@@ -1,3 +1,5 @@
+from types import SimpleNamespace
+
 import pytest
 
 from backend.app.db.migrations.versions import (
@@ -98,6 +100,42 @@ async def test_dashboard_aggregation_filters_disabled_skus_by_default() -> None:
 
     assert "skus.dashboard_enabled IS true" in str(session.statement)
     assert "aspect_mentions.quality_score >=" in str(session.statement)
+
+
+@pytest.mark.asyncio
+async def test_sku_summary_filters_disabled_skus_and_quality_by_default() -> None:
+    class SummaryResult:
+        def one(self):
+            return SimpleNamespace(review_count=0, mention_count=0)
+
+    session = CapturingSession(SummaryResult())
+
+    await AspectRepository(session).get_sku_week_summary(
+        sku_code="ecoflow-delta2", week_id=202403
+    )
+
+    statement = str(session.statement)
+    assert "skus.dashboard_enabled IS true" in statement
+    assert "aspect_mentions.quality_score >=" in statement
+    assert "count(distinct(aspect_mentions.document_id))" in statement
+
+
+@pytest.mark.asyncio
+async def test_sku_evidence_preserves_quality_and_provenance_scope() -> None:
+    session = CapturingSession()
+
+    await AspectRepository(session).get_sku_evidence(
+        sku_code="ecoflow-delta2",
+        week_id=202403,
+        sentiment="positive",
+        limit=5,
+    )
+
+    statement = str(session.statement)
+    assert "JOIN documents ON documents.id = aspect_mentions.document_id" in statement
+    assert "skus.dashboard_enabled IS true" in statement
+    assert "aspect_mentions.quality_score >=" in statement
+    assert "ORDER BY aspect_mentions.quality_score DESC" in statement
 
 
 @pytest.mark.asyncio
