@@ -40,8 +40,7 @@
     │   ├── ingestion/               # reddit_fetcher.py, amazon_loader.py
     │   ├── sanitize/                # pii_cleaner.py
     │   └── ...
-    ├── shared/
-    │   └── eval/                    # rag_eval.py (LLM-as-a-Judge)
+    ├── shared/                      # shared LLM client; semantic eval is planned for Week 4 Phase 12
     ├── frontend/                    # Next.js
     └── docker-compose.yml           # PostgreSQL + Milvus
 
@@ -113,7 +112,17 @@ The LLM may interpret intent, regenerate explicit tool arguments from visible re
   - `chat_messages` stores `tool_calls` and `tool_results` as JSONB.
   - *Decision*: `tool_results` only stores execution metadata (count/time), NOT the raw data payload, to save DB space and keep debugging clean.
 
-## 6. Flowchart
+## 6. Week 4 Product Surfaces (Phases 0–6)
+
+- The Next.js app uses TanStack Query for dashboard server state, React Context for JWT session state, and local component state for visible filters and streamed content. Redux/Zustand were not added.
+- `/overview` consumes only public `GET /api/weeks`, `GET /api/overview`, and `GET /api/skus`. It does not calculate new business metrics or fabricate the unavailable portfolio-movement metric.
+- `/skus/[sku_code]` composes existing SKU detail, trend, and positive/negative evidence reads. It filters selectable weeks to the `skus_covered` values returned by the backend, and renders raw backend trend points rather than client-side aggregates.
+- `AnswerCitation` is the shared evidence view model. The reusable frontend evidence card exposes the exact evidence preview and expandable `mention_id`/`document_id` plus source metadata. This preserves `mention_id == aspect_mentions.id == Milvus vector id` traceability.
+- `/compare` limits SKU B to a dashboard-enabled SKU in SKU A's `capacity_tier`, but `GET /api/compare` remains the independent server-side constraint boundary. It composes existing comparison, detail, trend, and evidence reads; no comparison-specific backend or LLM service was introduced.
+- The comparison page may request a one-shot grounded summary through the existing authenticated `POST /api/ask` SSE endpoint. Its message explicitly names the visible SKU pair and ISO week; it introduces no hidden Agent filters or comparison memory. It renders only streamed answer deltas and Agent-emitted citations.
+- No Week 4 Phase 0–6 migrations, persistence-model changes, or new backend routes were added. Report generation/replacement remains unimplemented.
+
+## 7. Flowchart
 
     flowchart TD
       %% Batch Pipeline (Worker Process)

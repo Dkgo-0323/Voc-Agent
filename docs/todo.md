@@ -55,11 +55,11 @@
 
 ## Week 4: Frontend, Eval & Polish
 - [ ] **Next.js Frontend Development**:
-  - [ ] Dashboard pages (Static views).
-  - [ ] Chat Interface ("Ask your data"): Handle the two-stage streaming, render Markdown, show citation popovers.
+  - [x] Product foundation, JWT session flow, Overview, Level 2 SKU Detail, and same-tier Compare (Phases 1–6).
+  - [ ] Weekly Report viewer/generation and Ask Your Data browser workspace (Phases 7–9).
 - [ ] **Evaluation System**:
-  - [ ] Write 50 "Golden Queries" (e.g., "Is Jackery 1000 better than Anker C1000?").
-  - [ ] Run `shared/eval/rag_eval.py` to test RAG accuracy.
+  - [ ] Write and validate the 50-query semantic Golden dataset.
+  - [ ] Implement and run the semantic evaluation framework (the planned `shared/eval/rag_eval.py` is not in this checkout).
   - [ ] Tweak system prompts and chunk retrieval numbers based on eval.
 - [ ] **Final Polish**:
   - [ ] Test Alembic migration on a fresh PostgreSQL instance.
