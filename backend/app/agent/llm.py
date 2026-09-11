@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+from copy import deepcopy
 from dataclasses import dataclass, field
 from typing import Any, Protocol
 
@@ -40,11 +41,13 @@ class OpenAIChatCompletionsModel:
         model: str,
         max_tokens: int,
         extra_body: dict[str, Any] | None = None,
+        final_response_format: dict[str, str] | None = None,
     ) -> None:
         self._client = client
         self._model = model
         self._max_tokens = max_tokens
         self._extra_body = extra_body or {}
+        self._final_response_format = final_response_format
 
     async def complete(
         self,
@@ -60,6 +63,8 @@ class OpenAIChatCompletionsModel:
         if tools:
             request["tools"] = tools
             request["tool_choice"] = "auto"
+        elif self._final_response_format:
+            request["response_format"] = deepcopy(self._final_response_format)
         if self._extra_body:
             request["extra_body"] = self._extra_body
         response = await self._client.chat.completions.create(**request)
@@ -92,8 +97,14 @@ class OpenAIChatCompletionsModel:
             parsed = json.loads(content)
         except json.JSONDecodeError:
             return ModelResponse(content=content)
-        if not isinstance(parsed, dict) or not isinstance(parsed.get("answer"), str):
+        if (
+            not isinstance(parsed, dict)
+            or set(parsed) != {"answer", "cited_evidence_ids"}
+            or not isinstance(parsed.get("answer"), str)
+            or not isinstance(parsed.get("cited_evidence_ids"), list)
+            or not all(isinstance(item, str) for item in parsed["cited_evidence_ids"])
+        ):
             return ModelResponse(content=content)
-        raw_ids = parsed.get("cited_evidence_ids", [])
-        cited_ids = [str(item) for item in raw_ids] if isinstance(raw_ids, list) else []
-        return ModelResponse(content=parsed["answer"], cited_evidence_ids=cited_ids)
+        return ModelResponse(
+            content=parsed["answer"], cited_evidence_ids=parsed["cited_evidence_ids"]
+        )

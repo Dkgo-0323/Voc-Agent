@@ -66,13 +66,38 @@ class AskRequest(BaseModel):
         return normalized
 
 
+def _normalized_base_url(value: str) -> str:
+    return value.rstrip("/").lower()
+
+
+def _uses_zhipu_json_mode() -> bool:
+    return "bigmodel.cn" in _normalized_base_url(settings.llm_base_url)
+
+
+def _resolve_llm_api_key() -> str:
+    """Reuse the embedding key only when both clients target the same provider."""
+    if settings.llm_api_key:
+        return settings.llm_api_key
+    if _normalized_base_url(settings.llm_base_url) == _normalized_base_url(
+        settings.embedding_base_url
+    ):
+        return settings.embedding_api_key
+    if "api.openai.com" in settings.llm_base_url:
+        return settings.openai_api_key
+    return ""
+
+
 async def get_conversation_service(
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AsyncGenerator[ConversationService, None]:
     """Build request-scoped services while keeping tool wiring out of the endpoint."""
 
-    llm_key = settings.llm_api_key or settings.openai_api_key
+    llm_key = _resolve_llm_api_key()
     embedding_key = settings.embedding_api_key or settings.openai_api_key
+    if not llm_key:
+        raise RuntimeError(
+            "LLM_API_KEY is not configured and no same-provider key can be reused"
+        )
     llm_client = AsyncOpenAI(
         api_key=llm_key,
         base_url=settings.llm_base_url,
@@ -98,6 +123,9 @@ async def get_conversation_service(
             model=settings.llm_model,
             max_tokens=settings.llm_max_tokens,
             extra_body=settings.llm_extra_body,
+            final_response_format=(
+                {"type": "json_object"} if _uses_zhipu_json_mode() else None
+            ),
         )
         agent_router = FunctionCallingRouter(
             model,

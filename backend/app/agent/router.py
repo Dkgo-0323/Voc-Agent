@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from collections.abc import Awaitable, Callable, Sequence
+from copy import deepcopy
 from dataclasses import dataclass
 from typing import Any
 from uuid import UUID
@@ -37,6 +38,89 @@ from backend.app.agent.tool_rag import build_answer_citations
 MAX_TOOL_CALLS = 3
 MAX_MODEL_ROUNDS = 8
 
+# Keep the provider-facing schemas deliberately flat.  Some OpenAI-compatible
+# providers accept Pydantic's JSON Schema but do not reliably follow local
+# ``$defs``/``$ref`` and nullable-union constructs when generating tool calls.
+# Pydantic models remain the authoritative validation boundary below.
+_PROVIDER_TOOL_PARAMETERS: dict[ToolName, dict[str, Any]] = {
+    ToolName.REPORT: {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "sku_code": {"type": "string", "minLength": 1},
+            "week_id": {"type": "integer", "minimum": 1},
+        },
+        "required": ["sku_code", "week_id"],
+    },
+    ToolName.SQL: {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "operation": {
+                "type": "string",
+                "enum": [
+                    "review_count",
+                    "sentiment_distribution",
+                    "aspect_distribution",
+                    "trend",
+                    "aspect_trend",
+                    "compare_skus",
+                ],
+            },
+            "sku_codes": {"type": "array", "items": {"type": "string"}},
+            "week_range": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "start_week_id": {"type": "integer", "minimum": 1},
+                    "end_week_id": {"type": "integer", "minimum": 1},
+                },
+                "required": ["start_week_id", "end_week_id"],
+            },
+            "aspect_label": {"type": "string", "minLength": 1},
+            "sentiment": {
+                "type": "string",
+                "enum": ["positive", "negative", "neutral"],
+            },
+            "comparison_metric": {
+                "type": "string",
+                "enum": [
+                    "mention_count",
+                    "positive_rate",
+                    "negative_rate",
+                    "sentiment_score",
+                ],
+            },
+            "limit": {"type": "integer", "minimum": 1, "maximum": 100},
+        },
+        "required": ["operation"],
+    },
+    ToolName.RAG: {
+        "type": "object",
+        "additionalProperties": False,
+        "properties": {
+            "query": {"type": "string", "minLength": 1},
+            "sku_codes": {"type": "array", "items": {"type": "string"}},
+            "week_range": {
+                "type": "object",
+                "additionalProperties": False,
+                "properties": {
+                    "start_week_id": {"type": "integer", "minimum": 1},
+                    "end_week_id": {"type": "integer", "minimum": 1},
+                },
+                "required": ["start_week_id", "end_week_id"],
+            },
+            "sentiment": {
+                "type": "string",
+                "enum": ["positive", "negative", "neutral"],
+            },
+            "aspect_label": {"type": "string", "minLength": 1},
+            "top_k": {"type": "integer", "minimum": 1},
+        },
+        "required": ["query"],
+    },
+}
+
 VOC_SYSTEM_POLICY = """You are the VOC analytical interface for the configured dataset.
 Use only approved tools and visible conversation messages. Never fill missing VOC data with
 general product knowledge. tool_report only reads stored weekly macro reports. tool_sql is the
@@ -49,6 +133,13 @@ sample-size warnings, unavailable metrics, empty results, and tool failures. A p
 allowed only when remaining successful results materially support it, and the unavailable part
 must be disclosed. When evidence is insufficient, abstain. You may combine tools; do not force a
 single-tool priority chain. Do not reveal chain-of-thought or private planning.
+
+Choose tool_report only when the user explicitly asks for an already-generated stored weekly
+report. Do not use it for a raw metric or an exact customer example. If tool_report returns
+not_found, reassess the original request: use tool_sql for requested metrics and tool_rag for
+requested examples when either can answer it. A missing report alone is not sufficient reason to
+abstain. Tool arguments must be a JSON object using sku_codes (an array) and week_range
+({"start_week_id": YYYYWW, "end_week_id": YYYYWW}) where filters are needed.
 
 When no more tools are needed, return a JSON object with exactly these fields:
 {"answer": "user-facing answer", "cited_evidence_ids": ["aspect_mentions UUIDs actually used"]}
@@ -78,7 +169,7 @@ class ToolBinding:
             "function": {
                 "name": self.name.value,
                 "description": self.description,
-                "parameters": self.argument_model.model_json_schema(),
+                "parameters": deepcopy(_PROVIDER_TOOL_PARAMETERS[self.name]),
             },
         }
 
@@ -160,6 +251,8 @@ class FunctionCallingRouter:
         model_rounds = 0
         limit_event: ToolCallLimitEvent | None = None
         force_final = False
+        report_miss_needs_reassessment = False
+        report_miss_reprompted = False
 
         while model_rounds < self._max_model_rounds:
             try:
@@ -201,6 +294,8 @@ class FunctionCallingRouter:
                     )
                 messages.append(self._assistant_tool_call_message(response.tool_calls))
                 limit_reached_this_round = False
+                if any(call.name != ToolName.REPORT.value for call in response.tool_calls):
+                    report_miss_needs_reassessment = False
                 for call in response.tool_calls:
                     attempted += 1
                     if attempted > MAX_TOOL_CALLS:
@@ -231,8 +326,11 @@ class FunctionCallingRouter:
                         messages.append(self._tool_error_message(call, error))
                         continue
                     try:
+                        normalized_call_arguments = self._normalize_provider_arguments(
+                            binding.name, call.arguments
+                        )
                         arguments = binding.argument_model.model_validate(
-                            call.arguments
+                            normalized_call_arguments
                         )
                     except ValidationError as exc:
                         error = ToolError(
@@ -309,6 +407,11 @@ class FunctionCallingRouter:
                     await self._emit_tool_completed(completed_trace, event_sink)
                     messages.append(self._tool_result_message(call, result))
                     evidence.extend(self._retrieved_evidence(result))
+                    if (
+                        result.tool_name is ToolName.REPORT
+                        and result.status is ToolStatus.NOT_FOUND
+                    ):
+                        report_miss_needs_reassessment = True
 
                 if limit_reached_this_round:
                     if not self._has_material_support(results):
@@ -333,6 +436,26 @@ class FunctionCallingRouter:
                     )
                 continue
 
+            if (
+                report_miss_needs_reassessment
+                and not report_miss_reprompted
+                and attempted < MAX_TOOL_CALLS
+            ):
+                report_miss_reprompted = True
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "The stored report was not found and does not answer the original "
+                            "request. Before giving a final answer, reconsider whether the request "
+                            "needs tool_sql for metrics and/or tool_rag for traceable examples. "
+                            "Choose only approved tools and valid JSON arguments; abstain only if "
+                            "those tools cannot provide VOC evidence."
+                        ),
+                    }
+                )
+                continue
+
             if not response.content or not response.content.strip():
                 return self._controlled_error(
                     "The model returned neither a tool call nor a final answer.",
@@ -343,6 +466,54 @@ class FunctionCallingRouter:
                     executed,
                     limit_event,
                 )
+            if self._requires_citation_correction(response, results, evidence):
+                if model_rounds >= self._max_model_rounds:
+                    return self._finalize(
+                        response,
+                        traces=traces,
+                        results=results,
+                        evidence=evidence,
+                        warnings=warnings,
+                        model_rounds=model_rounds,
+                        attempted=attempted,
+                        executed=executed,
+                        limit_event=limit_event,
+                    )
+                messages.append({"role": "assistant", "content": response.content})
+                messages.append(self._citation_correction_message(evidence))
+                try:
+                    response = await self._model.complete(messages=messages, tools=[])
+                except Exception as exc:
+                    model_rounds += 1
+                    return self._controlled_error(
+                        "The language model is temporarily unavailable.",
+                        traces,
+                        warnings,
+                        model_rounds,
+                        attempted,
+                        executed,
+                        limit_event,
+                        error=ToolError(
+                            code=(
+                                "llm_timeout"
+                                if isinstance(exc, TimeoutError)
+                                else "llm_request_failed"
+                            ),
+                            message="The language model is temporarily unavailable.",
+                            retryable=True,
+                        ),
+                    )
+                model_rounds += 1
+                if response.tool_calls or not response.content or not response.content.strip():
+                    return self._controlled_error(
+                        "The citation correction did not return a final JSON answer.",
+                        traces,
+                        warnings,
+                        model_rounds,
+                        attempted,
+                        executed,
+                        limit_event,
+                    )
             return self._finalize(
                 response,
                 traces=traces,
@@ -400,6 +571,95 @@ class FunctionCallingRouter:
         messages.extend(message.model_dump(mode="json") for message in recent_messages)
         messages.append({"role": "user", "content": current_user_message.strip()})
         return messages
+
+    @staticmethod
+    def _requires_citation_correction(
+        response: ModelResponse,
+        results: Sequence[ToolResult[Any, Any]],
+        evidence: Sequence[RetrievedEvidence],
+    ) -> bool:
+        if not response.content or not evidence:
+            return False
+        if not any(
+            result.tool_name is ToolName.RAG
+            and result.status in {ToolStatus.SUCCESS, ToolStatus.PARTIAL}
+            and result.payload is not None
+            for result in results
+        ):
+            return False
+        if not any(item.mention_text in response.content for item in evidence):
+            return False
+        retrieved_ids = {str(item.mention_id) for item in evidence}
+        return not response.cited_evidence_ids or not set(
+            response.cited_evidence_ids
+        ).issubset(retrieved_ids)
+
+    @staticmethod
+    def _citation_correction_message(
+        evidence: Sequence[RetrievedEvidence],
+    ) -> dict[str, str]:
+        allowed_ids = [str(item.mention_id) for item in evidence]
+        return {
+            "role": "system",
+            "content": (
+                "Your previous answer used an exact retrieved VOC example without a valid "
+                "citation. Return exactly one JSON object and no markdown: "
+                '{"answer":"user-facing grounded answer","cited_evidence_ids":["UUID"]}. '
+                "Preserve only claims supported by the available tool results. If the answer "
+                "uses an exact retrieved example, cite only its matching ID from this allowed "
+                f"list: {allowed_ids}. If the answer uses no retrieved evidence, return an empty "
+                "cited_evidence_ids list."
+            ),
+        }
+
+    @staticmethod
+    def _normalize_provider_arguments(
+        tool_name: ToolName,
+        raw_arguments: dict[str, Any] | str,
+    ) -> dict[str, Any] | str:
+        """Normalize safe provider naming variants before strict Pydantic validation."""
+        if not isinstance(raw_arguments, dict):
+            return raw_arguments
+        arguments = dict(raw_arguments)
+        for wrapper in ("arguments", "parameters"):
+            wrapped = arguments.get(wrapper)
+            if len(arguments) == 1 and isinstance(wrapped, dict):
+                arguments = dict(wrapped)
+
+        if tool_name is ToolName.REPORT:
+            return arguments
+
+        def move(source: str, target: str) -> None:
+            if target not in arguments and source in arguments:
+                arguments[target] = arguments.pop(source)
+
+        move("sku_code", "sku_codes")
+        move("sku", "sku_codes")
+        if isinstance(arguments.get("sku_codes"), str):
+            arguments["sku_codes"] = [arguments["sku_codes"]]
+
+        if "week_range" not in arguments:
+            week_id = arguments.pop("week_id", arguments.pop("week", None))
+            if isinstance(week_id, int):
+                arguments["week_range"] = {
+                    "start_week_id": week_id,
+                    "end_week_id": week_id,
+                }
+            elif "start_week_id" in arguments or "end_week_id" in arguments:
+                arguments["week_range"] = {
+                    "start_week_id": arguments.pop("start_week_id", None),
+                    "end_week_id": arguments.pop("end_week_id", None),
+                }
+
+        if tool_name is ToolName.SQL:
+            move("aspect", "aspect_label")
+            move("metric", "comparison_metric")
+        elif tool_name is ToolName.RAG:
+            move("search_query", "query")
+            move("semantic_query", "query")
+            move("aspect", "aspect_label")
+            move("limit", "top_k")
+        return arguments
 
     @staticmethod
     def _assistant_tool_call_message(

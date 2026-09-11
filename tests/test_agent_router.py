@@ -1,3 +1,4 @@
+import json
 from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any
@@ -312,6 +313,98 @@ async def test_rag_only_returns_only_actually_used_citation() -> None:
 
 
 @pytest.mark.asyncio
+async def test_rag_exact_quote_without_citation_gets_one_json_correction_round() -> None:
+    used = evidence_item()
+    unused = evidence_item(mention_text="charging is slower than expected")
+    executor = RecordingExecutor([rag_result([used, unused])])
+    model = ScriptedModel(
+        [
+            tool_call(
+                "rag-1",
+                ToolName.RAG,
+                {"query": "fan noise", "sku_codes": ["ecoflow-delta2"]},
+            ),
+            final(f'One review says "{used.mention_text}."'),
+            final(f'One review says "{used.mention_text}."', [used.mention_id]),
+        ]
+    )
+
+    result = await run_router(
+        model, [binding(ToolName.RAG, RagToolArguments, executor)]
+    )
+
+    assert result.status is AgentStatus.SUCCESS
+    assert [item.mention_id for item in result.citations] == [used.mention_id]
+    assert unused.mention_id not in [item.mention_id for item in result.citations]
+    assert model.calls[2]["tools"] == []
+    correction = model.calls[2]["messages"][-1]["content"]
+    assert str(used.mention_id) in correction
+    assert str(unused.mention_id) in correction
+    assert result.execution.attempted_tool_call_count == 1
+    assert result.execution.executed_tool_call_count == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("correction_mode", ["unknown", "empty", "non_json"])
+async def test_invalid_citation_correction_remains_a_controlled_failure(
+    correction_mode: str,
+) -> None:
+    evidence = evidence_item()
+    executor = RecordingExecutor([rag_result([evidence])])
+    if correction_mode == "unknown":
+        corrected = final(f'One review says "{evidence.mention_text}."', [uuid4()])
+    elif correction_mode == "empty":
+        corrected = final(f'One review says "{evidence.mention_text}."')
+    else:
+        corrected = ModelResponse(content=f'One review says "{evidence.mention_text}."')
+    model = ScriptedModel(
+        [
+            tool_call(
+                "rag-1",
+                ToolName.RAG,
+                {"query": "fan noise", "sku_codes": ["ecoflow-delta2"]},
+            ),
+            final(f'One review says "{evidence.mention_text}."'),
+            corrected,
+        ]
+    )
+
+    result = await run_router(
+        model, [binding(ToolName.RAG, RagToolArguments, executor)]
+    )
+
+    assert result.status is AgentStatus.ERROR
+    assert result.citations == []
+    assert model.calls[2]["tools"] == []
+    assert result.execution.attempted_tool_call_count == 1
+    assert result.execution.executed_tool_call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_rag_answer_without_exact_evidence_does_not_trigger_citation_correction() -> None:
+    evidence = evidence_item()
+    executor = RecordingExecutor([rag_result([evidence])])
+    model = ScriptedModel(
+        [
+            tool_call(
+                "rag-1",
+                ToolName.RAG,
+                {"query": "fan noise", "sku_codes": ["ecoflow-delta2"]},
+            ),
+            final("The retrieved VOC result supports a qualitative summary."),
+        ]
+    )
+
+    result = await run_router(
+        model, [binding(ToolName.RAG, RagToolArguments, executor)]
+    )
+
+    assert result.status is AgentStatus.SUCCESS
+    assert result.citations == []
+    assert len(model.calls) == 2
+
+
+@pytest.mark.asyncio
 async def test_sql_then_rag_multi_tool_synthesis() -> None:
     evidence = evidence_item()
     sql_executor = RecordingExecutor([sql_result()])
@@ -403,6 +496,143 @@ async def test_report_miss_can_fall_back_to_analytics() -> None:
         ToolStatus.NOT_FOUND,
         ToolStatus.SUCCESS,
     ]
+
+
+@pytest.mark.asyncio
+async def test_report_miss_reprompts_before_allowing_an_unsupported_final_answer() -> None:
+    report_executor = RecordingExecutor([report_result(found=False)])
+    sql_executor = RecordingExecutor([sql_result()])
+    model = ScriptedModel(
+        [
+            tool_call(
+                "report-1",
+                ToolName.REPORT,
+                {"sku_code": "ecoflow-delta2", "week_id": 202635},
+            ),
+            final("No stored report exists."),
+            tool_call(
+                "sql-1",
+                ToolName.SQL,
+                {"operation": "review_count", "sku_codes": ["ecoflow-delta2"]},
+            ),
+            final("No stored report exists; analytics found 12 reviews."),
+        ]
+    )
+
+    result = await run_router(
+        model,
+        [
+            binding(ToolName.REPORT, ReportToolArguments, report_executor),
+            binding(ToolName.SQL, AnalyticsToolArguments, sql_executor),
+        ],
+    )
+
+    assert result.status is AgentStatus.SUCCESS
+    assert [trace.tool_name for trace in result.tool_trace] == [
+        ToolName.REPORT.value,
+        ToolName.SQL.value,
+    ]
+    assert "stored report was not found" in model.calls[2]["messages"][-1]["content"]
+
+
+@pytest.mark.asyncio
+async def test_provider_argument_aliases_are_normalized_before_strict_validation() -> None:
+    sql_executor = RecordingExecutor([sql_result()])
+    rag_executor = RecordingExecutor([rag_result([evidence_item()])])
+    model = ScriptedModel(
+        [
+            tool_call(
+                "sql-1",
+                ToolName.SQL,
+                {
+                    "operation": "review_count",
+                    "sku_code": "ecoflow-delta2",
+                    "week_id": 202635,
+                },
+            ),
+            tool_call(
+                "rag-1",
+                ToolName.RAG,
+                {
+                    "search_query": "fan noise",
+                    "sku": "ecoflow-delta2",
+                    "week": 202635,
+                    "aspect": "noise_level",
+                    "limit": 1,
+                },
+            ),
+            final("The supported answer.", [rag_executor.results[0].payload.evidence[0].mention_id]),
+        ]
+    )
+
+    result = await run_router(
+        model,
+        [
+            binding(ToolName.SQL, AnalyticsToolArguments, sql_executor),
+            binding(ToolName.RAG, RagToolArguments, rag_executor),
+        ],
+    )
+
+    assert result.status is AgentStatus.SUCCESS
+    assert sql_executor.calls[0].sku_codes == ["ecoflow-delta2"]
+    assert sql_executor.calls[0].week_range is not None
+    assert sql_executor.calls[0].week_range.start_week_id == 202635
+    assert rag_executor.calls[0].query == "fan noise"
+    assert rag_executor.calls[0].sku_codes == ["ecoflow-delta2"]
+    assert rag_executor.calls[0].top_k == 1
+
+
+@pytest.mark.asyncio
+async def test_provider_argument_normalization_does_not_accept_unknown_fields() -> None:
+    executor = RecordingExecutor([sql_result()])
+    model = ScriptedModel(
+        [
+            tool_call(
+                "sql-1",
+                ToolName.SQL,
+                {
+                    "operation": "review_count",
+                    "sku_code": "ecoflow-delta2",
+                    "sql": "SELECT * FROM documents",
+                },
+            ),
+            final("The query succeeded."),
+        ]
+    )
+
+    result = await run_router(
+        model, [binding(ToolName.SQL, AnalyticsToolArguments, executor)]
+    )
+
+    assert result.status is AgentStatus.ERROR
+    assert executor.calls == []
+    assert result.tool_trace[0].error is not None
+    assert result.tool_trace[0].error.code == "invalid_tool_arguments"
+
+
+def test_provider_tool_schemas_are_flat_and_keep_required_contracts() -> None:
+    executor = RecordingExecutor([])
+    sql_schema = binding(
+        ToolName.SQL, AnalyticsToolArguments, executor
+    ).definition()["function"]["parameters"]
+    rag_schema = binding(
+        ToolName.RAG, RagToolArguments, executor
+    ).definition()["function"]["parameters"]
+
+    assert "$defs" not in sql_schema
+    assert "anyOf" not in json.dumps(sql_schema)
+    assert sql_schema["required"] == ["operation"]
+    assert sql_schema["properties"]["operation"]["enum"] == [
+        "review_count",
+        "sentiment_distribution",
+        "aspect_distribution",
+        "trend",
+        "aspect_trend",
+        "compare_skus",
+    ]
+    assert "$defs" not in rag_schema
+    assert "anyOf" not in json.dumps(rag_schema)
+    assert rag_schema["required"] == ["query"]
 
 
 @pytest.mark.asyncio
@@ -710,6 +940,7 @@ async def test_final_answer_cannot_use_unverified_or_uncited_evidence(
                 ToolName.RAG,
                 {"query": "fan noise", "sku_codes": ["ecoflow-delta2"]},
             ),
+            final(f'A review says "{evidence.mention_text}."', cited_ids),
             final(f'A review says "{evidence.mention_text}."', cited_ids),
         ]
     )

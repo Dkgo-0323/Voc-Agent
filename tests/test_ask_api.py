@@ -27,11 +27,14 @@ from backend.app.agent.schemas import (
 )
 from backend.app.api.ask import (
     AskRequest,
+    _resolve_llm_api_key,
+    _uses_zhipu_json_mode,
     get_conversation_service,
     get_request_identity,
     stream_ask_events,
 )
 from backend.app.core.database import get_db
+from backend.app.core.settings import settings
 from backend.app.db.repositories.schemas import ChatSessionRead
 from backend.app.main import app
 
@@ -39,6 +42,31 @@ SESSION_ID = UUID("10000000-0000-0000-0000-000000000001")
 USER_MESSAGE_ID = UUID("20000000-0000-0000-0000-000000000001")
 ASSISTANT_MESSAGE_ID = UUID("30000000-0000-0000-0000-000000000001")
 NOW = datetime(2026, 8, 31, tzinfo=UTC)
+
+
+def test_llm_key_reuses_embedding_key_only_for_the_same_provider(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "llm_api_key", "")
+    monkeypatch.setattr(settings, "openai_api_key", "legacy-key")
+    monkeypatch.setattr(settings, "embedding_api_key", "embedding-key")
+    monkeypatch.setattr(settings, "llm_base_url", "https://provider.test/v1/")
+    monkeypatch.setattr(settings, "embedding_base_url", "https://provider.test/v1")
+
+    assert _resolve_llm_api_key() == "embedding-key"
+
+    monkeypatch.setattr(settings, "embedding_base_url", "https://other-provider.test/v1")
+    assert _resolve_llm_api_key() == ""
+
+
+def test_zhipu_json_mode_is_provider_scoped(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setattr(settings, "llm_base_url", "https://open.bigmodel.cn/api/paas/v4/")
+    assert _uses_zhipu_json_mode() is True
+
+    monkeypatch.setattr(settings, "llm_base_url", "https://api.openai.com/v1")
+    assert _uses_zhipu_json_mode() is False
 
 
 def trace(
