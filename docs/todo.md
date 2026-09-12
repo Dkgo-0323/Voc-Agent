@@ -54,7 +54,7 @@
   - [x] Live authenticated RAG E2E verification with the configured Zhipu LLM and embedding provider, Milvus retrieval, PostgreSQL evidence hydration, SSE citation, and `done:success`.
 
 ## Week 4: Frontend, Eval & Polish
-- [ ] **Next.js Frontend Development**:
+- [x] **Next.js Frontend Development**:
   - [x] Product foundation, JWT session flow, Overview, Level 2 SKU Detail, and same-tier Compare (Phases 1–6).
   - [x] Weekly Report viewer and explicit streamed generation (Phase 8).
   - [x] Ask Your Data browser workspace (Phase 9).
@@ -63,7 +63,7 @@
   - [x] Authenticated `POST /api/reports/generate` SSE lifecycle with safe errors.
   - [x] Deterministic analytics plus filtered RAG evidence, bounded LLM synthesis, and candidate validation.
   - [x] Transactional create/replacement that preserves a prior report on failure or cancellation.
-- [ ] **Evaluation System**:
+- [x] **Evaluation System**:
   - [x] Write and validate the 50-query semantic Golden dataset (Phase 11).
   - [x] Implement the semantic evaluation framework with deterministic checks, structured LLM judge support, JSON output, and release gates (Phase 12).
   - [x] Run fixture-backed semantic evaluation, classify failures, and fix evaluation root causes without changing Agent behavior (Phase 13).

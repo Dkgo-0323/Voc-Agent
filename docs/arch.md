@@ -127,7 +127,15 @@ The LLM may interpret intent, regenerate explicit tool arguments from visible re
 - `/ask` is protected by the existing authenticated app shell and streams only the established `POST /api/ask` contract. The browser keeps its visible messages locally and returns the committed `session_id` only for a follow-up; conversation context remains the server's recent-N messages with no hidden agent filters or state. Tool lifecycle events become friendly status text, while only Agent-emitted used citations are rendered in popovers with their evidence preview, platform, SKU, and week. Cancellation uses `AbortController`; structured errors and abstentions are shown safely without raw tool arguments, provider details, stack traces, or hidden reasoning.
 - The Phase 10 reliability pass adds local stream cancellation and terminal-event checks to the existing Ask, comparison-summary, and report-generation consumers. An unexpected stream close is a retryable user-facing failure, never a successful completion; cancelled report regeneration preserves the already persisted report. The app segment also has a safe retry boundary, auth bootstrap failures offer retry, and evidence/citation UI wraps long traceability fields without changing provenance.
 
-## 7. Flowchart
+## 7. Week 4 Evaluation (Phases 11–13)
+
+- `shared/eval/semantic_golden.py` defines a separately curated 50-case semantic Golden dataset. It complements, rather than replaces, the 20-case deterministic Week 3 router regression suite.
+- `shared/eval/rag_eval.py` evaluates normal `AgentRunResult` objects or persisted observations. Deterministic checks enforce tool selection and bounds, numeric values, citation requirements and provenance, abstention, visible follow-up context, and cross-tier restrictions. Structured LLM judging is limited to answer correctness, retrieval relevance, citation groundedness, and unsupported-claim assessment.
+- An evaluation report retains every case, check, judge result or error, category, dimension score, and locked release gate. An unmeasured semantic gate is failed rather than averaged away; no failure is hidden behind a combined score.
+- The Phase 13 controlled executor (`shared/eval/fixture_execution.py`) is deliberately bound to the Golden fixtures, and `shared/eval/fixture_live_run.py` runs those observations through the configured LLM judge. This is repeatable evaluation infrastructure, not a replacement for live PostgreSQL/Milvus or browser release verification.
+- The final Phase 13 fixture/provider artifact is `artifacts/eval/phase13_fixture_live_judge.json`. It meets all locked gates, while retaining a non-blocking SG37 judge-quality review category; Phase 14 must still validate a clean live environment and browser product flows.
+
+## 8. Flowchart
 
     flowchart TD
       %% Batch Pipeline (Worker Process)

@@ -43,7 +43,7 @@ business rule was modified.
 results from the final configured-provider run. The documented release gates
 all pass:
 
-- tool/routing 100%; answer correctness 100%; retrieval relevance 100%;
+- tool/routing 100%; answer correctness 99%; retrieval relevance 100%;
   citation groundedness 100%; abstention 100%; follow-up 100%; deterministic
   numeric correctness 100%;
 - cross-tier violations 0; citation provenance violations 0; critical
@@ -51,7 +51,8 @@ all pass:
 
 The Week 3 deterministic suite remains 20/20 green; focused evaluation tests
 cover the fixture adapter, result schema, gates, judge aggregation, and the
-three zero-tolerance contracts.
+three zero-tolerance contracts. The 99% answer score is the average semantic
+judge score, not a failed case: all 50 answer-correctness checks passed.
 
 ## Manual review
 
