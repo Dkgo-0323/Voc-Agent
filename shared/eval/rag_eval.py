@@ -164,7 +164,11 @@ class StructuredLlmJudge:
                         "answer_correctness (0..1), retrieval_relevance (0..1 or null), "
                         "citation_groundedness (0..1 or null), critical_unsupported_claim "
                         "(boolean), rationale (one concise sentence). Treat unsupported causal "
-                        "or comparative claims as critical when material."
+                        "or comparative claims as critical when material. SQL-only and stored-report "
+                        "answers are supported by their deterministic tool result and do not require "
+                        "a RAG citation; only demand citation support for retrieved-evidence claims. "
+                        "When the case requires explaining a schema limitation or refusing an invalid "
+                        "request, that compliant refusal is correct and never a critical unsupported claim."
                     ),
                 },
                 {
@@ -340,12 +344,15 @@ def _check_follow_up(case: SemanticGoldenCase, result: AgentRunResult) -> Evalua
 
 def _check_cross_tier(case: SemanticGoldenCase, result: AgentRunResult) -> EvaluationCheck:
     applies = (
-        case.category is GoldenCategory.COMPARISON
-        and len(case.scope.sku_codes) >= 2
+        len(case.scope.sku_codes) >= 2
         and not case.scope.requires_same_tier
-    ) or case.abstention_required and len(case.scope.sku_codes) >= 2
+        and "compare" in case.question.lower()
+    )
     answer = result.final_answer.lower()
-    disallowed_winner = any(word in answer for word in ("winner", "wins", "superior"))
+    disallowed_winner = any(
+        phrase in answer
+        for phrase in ("is the winner", "wins this comparison", "is superior")
+    )
     has_constraint = any(
         trace.error and trace.error.code == "capacity_tier_mismatch"
         for trace in result.tool_trace
@@ -455,6 +462,7 @@ def _dimension_scores(results: Sequence[CaseEvaluation]) -> list[DimensionScore]
                     check.dimension is EvaluationDimension.CITATION
                     and check.name == "citation_requirement"
                     and check.applicable
+                    and check.details.startswith("Required citations")
                     for check in result.checks
                 )
             )

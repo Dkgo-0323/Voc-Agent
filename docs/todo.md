@@ -66,7 +66,7 @@
 - [ ] **Evaluation System**:
   - [x] Write and validate the 50-query semantic Golden dataset (Phase 11).
   - [x] Implement the semantic evaluation framework with deterministic checks, structured LLM judge support, JSON output, and release gates (Phase 12).
-  - [ ] Tweak system prompts and chunk retrieval numbers based on eval.
+  - [x] Run fixture-backed semantic evaluation, classify failures, and fix evaluation root causes without changing Agent behavior (Phase 13).
 - [ ] **Final Polish**:
   - [ ] Test Alembic migration on a fresh PostgreSQL instance.
   - [ ] Write clear "How to Run" in `README.md`.

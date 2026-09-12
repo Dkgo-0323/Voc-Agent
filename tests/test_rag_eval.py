@@ -202,6 +202,42 @@ def test_persisted_structured_judge_scores_contribute_to_semantic_dimensions() -
     assert scores[EvaluationDimension.CITATION] == 1
 
 
+def test_citation_groundedness_excludes_cases_that_forbid_citations() -> None:
+    required_case = next(item for item in SEMANTIC_GOLDEN_DATASET.cases if item.case_id == "SG21")
+    forbidden_case = next(item for item in SEMANTIC_GOLDEN_DATASET.cases if item.case_id == "SG01")
+    assessment = JudgeAssessment(
+        answer_correctness=1,
+        retrieval_relevance=1,
+        citation_groundedness=1,
+        critical_unsupported_claim=False,
+        rationale="Supported.",
+    )
+    report = evaluate_observations(
+        [
+            ObservedCase(
+                case_id=required_case.case_id,
+                result=_result(
+                    answer="A cited review supports this.",
+                    tools=[ToolName.RAG],
+                    citations=[_citation()],
+                ),
+            ),
+            ObservedCase(
+                case_id=forbidden_case.case_id,
+                result=_result(
+                    answer="12 negative mentions across 8 reviews.",
+                    tools=[ToolName.SQL],
+                ),
+            ),
+        ],
+        judge_results={required_case.case_id: assessment, forbidden_case.case_id: assessment},
+    )
+
+    score = next(item for item in report.dimensions if item.dimension is EvaluationDimension.CITATION)
+    assert score.applicable_cases == 1
+    assert score.score == 1
+
+
 @pytest.mark.asyncio
 async def test_run_dataset_records_executor_failures_per_case() -> None:
     async def failing_executor(_case):
