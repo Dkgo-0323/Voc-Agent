@@ -92,6 +92,9 @@ known-first-party = ["backend"]
 asyncio_mode = "auto"
 testpaths = ["tests"]
 python_files = ["test_*.py"]
+# Keep pytest's generated files within the checkout. This avoids inherited
+# Windows Temp ACLs and a sandbox-owned .pytest_cache from blocking local runs.
+addopts = "--basetemp=.pytest-tmp -p no:cacheprovider"
 
 # ── MyPy ─────────────────────────────────────────────────────
 [tool.mypy]
