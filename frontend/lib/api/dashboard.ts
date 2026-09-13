@@ -166,7 +166,11 @@ export async function fetchComparison(
   weekId: number,
 ): Promise<ComparisonResponse> {
   const response = await publicApiClient.get<ComparisonResponse>("/api/compare", {
-    params: { sku_code: [skuA, skuB], week_id: weekId },
+    params: new URLSearchParams([
+      ["sku_code", skuA],
+      ["sku_code", skuB],
+      ["week_id", String(weekId)],
+    ]),
   });
   return response.data;
 }

@@ -88,7 +88,12 @@ app = FastAPI(
 # ── CORS（开发阶段放开，生产收紧） ────────────────────────────────────────────
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"] if settings.is_development else ["https://your-domain.com"],
+    # Browsers reject a credentialed CORS response whose allowed origin is
+    # ``*``. Keep development convenient while echoing only a local origin.
+    allow_origins=[] if settings.is_development else ["https://your-domain.com"],
+    allow_origin_regex=(
+        r"https?://(localhost|127\.0\.0\.1)(:\d+)?" if settings.is_development else None
+    ),
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

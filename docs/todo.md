@@ -68,5 +68,9 @@
   - [x] Implement the semantic evaluation framework with deterministic checks, structured LLM judge support, JSON output, and release gates (Phase 12).
   - [x] Run fixture-backed semantic evaluation, classify failures, and fix evaluation root causes without changing Agent behavior (Phase 13).
 - [ ] **Final Polish**:
-  - [ ] Test Alembic migration on a fresh PostgreSQL instance.
-  - [ ] Write clear "How to Run" in `README.md`.
+  - [x] Phase 14 release verification: fresh PostgreSQL migration/seed, isolated
+    Milvus fixture, backend/worker/frontend startup, browser E2E, and Week 1-3
+    regressions.
+  - [x] Add the reproducible setup and release-test commands required by the
+    Phase 14 exit gate to `README.md`.
+  - [ ] Complete the broader Phase 15 documentation and demo-polish pass.

@@ -536,6 +536,32 @@ async def test_report_miss_reprompts_before_allowing_an_unsupported_final_answer
 
 
 @pytest.mark.asyncio
+async def test_unsupported_first_round_answer_is_reprompted_for_grounding() -> None:
+    sql_executor = RecordingExecutor([sql_result()])
+    model = ScriptedModel(
+        [
+            final("I can answer without using a tool."),
+            tool_call(
+                "sql-1",
+                ToolName.SQL,
+                {"operation": "review_count", "sku_codes": ["ecoflow-delta2"]},
+            ),
+            final("The grounded answer uses 12 reviews."),
+        ]
+    )
+
+    result = await run_router(
+        model,
+        [binding(ToolName.SQL, AnalyticsToolArguments, sql_executor)],
+    )
+
+    assert result.status is AgentStatus.SUCCESS
+    assert result.execution.model_round_count == 3
+    assert [trace.tool_name for trace in result.tool_trace] == [ToolName.SQL.value]
+    assert "No approved tool result" in model.calls[1]["messages"][-1]["content"]
+
+
+@pytest.mark.asyncio
 async def test_provider_argument_aliases_are_normalized_before_strict_validation() -> None:
     sql_executor = RecordingExecutor([sql_result()])
     rag_executor = RecordingExecutor([rag_result([evidence_item()])])

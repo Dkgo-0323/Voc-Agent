@@ -34,6 +34,7 @@ from backend.app.agent.schemas import (
     ToolWarning,
 )
 from backend.app.agent.tool_rag import build_answer_citations
+from pipelines.enrichment.prompts import ASPECT_LABELS
 
 MAX_TOOL_CALLS = 3
 MAX_MODEL_ROUNDS = 8
@@ -77,7 +78,10 @@ _PROVIDER_TOOL_PARAMETERS: dict[ToolName, dict[str, Any]] = {
                 },
                 "required": ["start_week_id", "end_week_id"],
             },
-            "aspect_label": {"type": "string", "minLength": 1},
+            "aspect_label": {
+                "type": "string",
+                "enum": list(ASPECT_LABELS),
+            },
             "sentiment": {
                 "type": "string",
                 "enum": ["positive", "negative", "neutral"],
@@ -114,7 +118,10 @@ _PROVIDER_TOOL_PARAMETERS: dict[ToolName, dict[str, Any]] = {
                 "type": "string",
                 "enum": ["positive", "negative", "neutral"],
             },
-            "aspect_label": {"type": "string", "minLength": 1},
+            "aspect_label": {
+                "type": "string",
+                "enum": list(ASPECT_LABELS),
+            },
             "top_k": {"type": "integer", "minimum": 1},
         },
         "required": ["query"],
@@ -151,9 +158,7 @@ NO_DATA_ANSWER = (
 )
 
 ToolExecutor = Callable[[AgentSchema], Awaitable[ToolResult[Any, Any]]]
-ToolLifecycleSink = Callable[
-    [ToolStartedEvent | ToolCompletedEvent], Awaitable[None]
-]
+ToolLifecycleSink = Callable[[ToolStartedEvent | ToolCompletedEvent], Awaitable[None]]
 
 
 @dataclass(frozen=True)
@@ -253,6 +258,7 @@ class FunctionCallingRouter:
         force_final = False
         report_miss_needs_reassessment = False
         report_miss_reprompted = False
+        unsupported_final_reprompted = False
 
         while model_rounds < self._max_model_rounds:
             try:
@@ -294,7 +300,9 @@ class FunctionCallingRouter:
                     )
                 messages.append(self._assistant_tool_call_message(response.tool_calls))
                 limit_reached_this_round = False
-                if any(call.name != ToolName.REPORT.value for call in response.tool_calls):
+                if any(
+                    call.name != ToolName.REPORT.value for call in response.tool_calls
+                ):
                     report_miss_needs_reassessment = False
                 for call in response.tool_calls:
                     attempted += 1
@@ -377,10 +385,10 @@ class FunctionCallingRouter:
                             retryable=True,
                         )
                         failed_trace = self._failed_trace(
-                                call,
-                                error,
-                                executed=True,
-                                normalized_arguments=arguments.model_dump(mode="json"),
+                            call,
+                            error,
+                            executed=True,
+                            normalized_arguments=arguments.model_dump(mode="json"),
                         )
                         traces.append(failed_trace)
                         await self._emit_tool_completed(failed_trace, event_sink)
@@ -390,18 +398,18 @@ class FunctionCallingRouter:
                     results.append(result)
                     warnings.extend(result.warnings)
                     completed_trace = ToolCallTrace(
-                            call_id=call.call_id,
-                            tool_name=call.name,
-                            arguments=call.arguments,
-                            normalized_arguments=result.normalized_args.model_dump(
-                                mode="json"
-                            ),
-                            executed=True,
-                            status=result.status,
-                            duration_ms=result.execution.duration_ms,
-                            result_count=result.execution.result_count,
-                            warnings=result.warnings,
-                            error=result.error,
+                        call_id=call.call_id,
+                        tool_name=call.name,
+                        arguments=call.arguments,
+                        normalized_arguments=result.normalized_args.model_dump(
+                            mode="json"
+                        ),
+                        executed=True,
+                        status=result.status,
+                        duration_ms=result.execution.duration_ms,
+                        result_count=result.execution.result_count,
+                        warnings=result.warnings,
+                        error=result.error,
                     )
                     traces.append(completed_trace)
                     await self._emit_tool_completed(completed_trace, event_sink)
@@ -456,6 +464,25 @@ class FunctionCallingRouter:
                 )
                 continue
 
+            if (
+                definitions
+                and not traces
+                and not results
+                and not unsupported_final_reprompted
+            ):
+                unsupported_final_reprompted = True
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": (
+                            "No approved tool result supports a VOC answer yet. Reassess the "
+                            "user request and call tool_sql for metrics and/or tool_rag for "
+                            "traceable examples. Do not answer from general knowledge."
+                        ),
+                    }
+                )
+                continue
+
             if not response.content or not response.content.strip():
                 return self._controlled_error(
                     "The model returned neither a tool call nor a final answer.",
@@ -504,7 +531,11 @@ class FunctionCallingRouter:
                         ),
                     )
                 model_rounds += 1
-                if response.tool_calls or not response.content or not response.content.strip():
+                if (
+                    response.tool_calls
+                    or not response.content
+                    or not response.content.strip()
+                ):
                     return self._controlled_error(
                         "The citation correction did not return a final JSON answer.",
                         traces,
