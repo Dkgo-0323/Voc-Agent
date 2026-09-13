@@ -6,6 +6,11 @@
 >
 > The operator will send the phase prompt for one phase at a time.
 
+> **Implementation status (2026-09-13):** Phases 0-15 are complete. This file
+> remains the historical execution plan; `arch.md`, `todo.md`, and the Phase
+> 14/15 handoffs describe the implemented release baseline. Planned wording
+> below is not evidence that a feature exists.
+
 ---
 
 # 0. Week 4 Mission
@@ -1578,9 +1583,9 @@ test(eval): add 50-query semantic golden dataset
 ```text
 Implement Week 4 Phase 11: 50-Query Golden Dataset.
 
-Inspect the existing Week 3 deterministic 19-query regression suite and current eval tooling first.
+Inspect the existing Week 3 deterministic suite (20 cases at the final baseline) and current eval tooling first.
 
-Do not replace the 19-query suite.
+Do not replace the deterministic Week 3 suite.
 
 Create a separate curated semantic Golden dataset with exactly 50 reviewed cases, targeting approximately:
 - 7 quantitative;
@@ -2096,58 +2101,59 @@ Week 4 is complete when all of the following are true.
 
 ## Product
 
-- [ ] Login flow works.
-- [ ] Overview is functional.
-- [ ] SKU Detail is functional for all locked SKUs.
-- [ ] Compare only supports same-tier products.
-- [ ] Weekly Report viewer works.
-- [ ] Weekly Report generation works through SSE.
-- [ ] Regeneration safely replaces only after success.
-- [ ] Ask Your Data works from the browser.
-- [ ] Friendly tool progress is visible.
-- [ ] Markdown answers render correctly.
-- [ ] Used citations are interactive.
-- [ ] Citation popovers expose evidence metadata.
-- [ ] Follow-up conversations work.
-- [ ] No-data cases abstain cleanly.
+- [x] Login flow works.
+- [x] Overview is functional.
+- [x] SKU Detail is functional for all locked SKUs.
+- [x] Compare only supports same-tier products.
+- [x] Weekly Report viewer works.
+- [x] Weekly Report generation works through SSE.
+- [x] Regeneration safely replaces only after success.
+- [x] Ask Your Data works from the browser.
+- [x] Friendly tool progress is visible.
+- [x] Markdown answers render correctly.
+- [x] Used citations are interactive.
+- [x] Citation popovers expose evidence metadata.
+- [x] Follow-up conversations work.
+- [x] No-data cases abstain cleanly.
 
 ## Engineering
 
-- [ ] Frontend uses TanStack Query for server state.
-- [ ] Auth is lightweight and reuses existing JWT backend.
-- [ ] Backend remains authoritative for deterministic business rules.
-- [ ] Cross-tier validation exists server-side.
-- [ ] Evidence provenance remains intact.
-- [ ] Existing Week 1–3 contracts remain preserved.
-- [ ] No unnecessary Redux/Redis/Celery/GraphQL infrastructure was added.
+- [x] Frontend uses TanStack Query for server state.
+- [x] Auth is lightweight and reuses existing JWT backend.
+- [x] Backend remains authoritative for deterministic business rules.
+- [x] Cross-tier validation exists server-side.
+- [x] Evidence provenance remains intact.
+- [x] Existing Week 1–3 contracts remain preserved.
+- [x] No unnecessary Redux/Redis/Celery/GraphQL infrastructure was added.
 
 ## Evaluation
 
-- [ ] Existing 19-query deterministic regression suite remains.
-- [ ] Separate 50-query semantic Golden dataset exists.
-- [ ] Evaluation runner reports per-case/per-dimension results.
-- [ ] Deterministic assertions and LLM Judge are separated appropriately.
-- [ ] Failed/borderline cases receive human review.
-- [ ] Release metric thresholds pass.
-- [ ] Zero-tolerance violations are zero.
+- [x] Existing deterministic regression suite remains (20 cases after the
+  Week 3 closing addition).
+- [x] Separate 50-query semantic Golden dataset exists.
+- [x] Evaluation runner reports per-case/per-dimension results.
+- [x] Deterministic assertions and LLM Judge are separated appropriately.
+- [x] Failed/borderline cases receive human review.
+- [x] Release metric thresholds pass.
+- [x] Zero-tolerance violations are zero.
 
 ## Reproducibility
 
-- [ ] Fresh PostgreSQL migration works.
-- [ ] Milvus contract is validated.
-- [ ] Required demo/test data setup is documented.
-- [ ] Backend can start from documented commands.
-- [ ] Worker can start from documented commands.
-- [ ] Frontend can start from documented commands.
-- [ ] Browser E2E release regression passes.
+- [x] Fresh PostgreSQL migration works.
+- [x] Milvus contract is validated.
+- [x] Required demo/test data setup is documented.
+- [x] Backend can start from documented commands.
+- [x] Worker can start from documented commands.
+- [x] Frontend can start from documented commands.
+- [x] Browser E2E release regression passes.
 
 ## Documentation
 
-- [ ] README How to Run is accurate.
-- [ ] Architecture docs reflect Week 4.
-- [ ] TODO reflects completed work.
-- [ ] Known limitations are explicit.
-- [ ] Demo flow is documented.
+- [x] README How to Run is accurate.
+- [x] Architecture docs reflect Week 4.
+- [x] TODO reflects completed work.
+- [x] Known limitations are explicit.
+- [x] Demo flow is documented.
 
 ---
 

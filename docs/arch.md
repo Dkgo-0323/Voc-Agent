@@ -1,166 +1,208 @@
-# Architecture & Key Decisions (VOC Agent MVP)
+# VOC Agent Architecture
 
-## 0. Scope & Upgrades
-- **Target**: Outdoor power stations VOC weekly intelligence with a controlled multi-turn analytical Agent. Week 3 is signed off: minimal JWT authentication, structured Agent streaming, the deterministic 19-query smoke/golden acceptance set, and a live Zhipu + embedding provider + Milvus + PostgreSQL RAG verification are complete.
-- **Core Stack**: Python 3.11+, `uv`, FastAPI (Async), SQLAlchemy 2.0 (asyncio), PostgreSQL 15, Milvus 2.x.
-- **Major Upgrades from v1**:
-  - Completely abandoned SQLite to avoid Alembic migration incompatibilities with JSONB/ARRAY types.
-  - Abandoned LangChain/LlamaIndex in favor of a **Pure Handwritten Function Calling Loop** for maximum transparency and control.
-  - Chat history relies entirely on PostgreSQL with indexing (Abandoned Redis as over-engineering for MVP).
-  - Independent Worker Process for APScheduler to prevent CPU-intensive pipelines from blocking the API event loop.
+This document describes the implemented repository at the end of Week 4. It
+is a local engineering/demo architecture, not a production-readiness claim.
 
-## 1. System Topology
-- **Data Ingestion (Pipelines)**: Weekly batch processing. Fetches from PRAW (Reddit) & McAuley dataset (Amazon). Sanitizes via Presidio.
-- **Worker Process**: Independent python process (`python -m backend.worker.main`) running APScheduler to execute the ingestion and enrichment pipelines.
-- **Backend (FastAPI)**: Exposes PostgreSQL-backed dashboard APIs and `POST /api/ask` as a structured SSE stream.
-- **Agent Layer**: A bounded handwritten function-calling router composes deterministic analytics, traceable evidence retrieval, and read-only stored reports. PostgreSQL stores recent conversation history and compact execution metadata.
-- **Authentication**: A configured single-password login issues expiring JWTs; bearer verification protects `/api/ask`. The existing read-only dashboard routes remain public.
+## System boundaries
 
-## 2. Directory Structure
+VOC Agent has four independently understandable layers:
 
-    voc-agent/
-    ├── pyproject.toml               # uv package manager configs
-    ├── alembic.ini                  # alembic configs
-    ├── docs/                        # prompts.md, arch.md, todo.md
-    ├── backend/                     # Async architecture
-    │   ├── app/
-    │   │   ├── main.py
-    │   │   ├── core/                # settings, security.py (JWT), database.py (async engine)
-    │   │   ├── api/                 # Dashboard routes and SSE /api/ask transport
-    │   │   ├── agent/               # Schemas, tools, router, LLM adapter, conversation service
-    │   │   ├── db/
-    │   │   │   ├── models.py        # 7 core ORM models
-    │   │   │   ├── seed.py          # Initial SKU injection
-    │   │   │   └── migrations/      # alembic env.py (async mode) & versions
-    │   ├── worker/                  # ★ Independent Process
-    │   │   ├── main.py              # APScheduler entry point
-    │   │   └── jobs.py              # Pipeline execution logic
-    ├── pipelines/                   # Batch processing base
-    │   ├── config/                  # targets.py (SKU mappings)
-    │   ├── ingestion/               # reddit_fetcher.py, amazon_loader.py
-    │   ├── sanitize/                # pii_cleaner.py
-    │   └── ...
-    ├── shared/                      # shared LLM client and Phase 12 semantic evaluation framework
-    ├── frontend/                    # Next.js
-    └── docker-compose.yml           # PostgreSQL + Milvus
+1. A batch pipeline ingests, sanitizes, enriches, scores, and embeds customer
+   text for five locked portable-power SKUs.
+2. PostgreSQL stores all relational/product facts, workflow state, reports,
+   chat history, and citation records. Milvus stores only retrieval vectors and
+   scalar search metadata.
+3. FastAPI exposes deterministic read models, authentication, report
+   generation, and a controlled handwritten Agent.
+4. Next.js renders the product and keeps server state, auth state, and local UI
+   state separate.
 
-## 3. Week 2 Pipeline & Dashboard
+```text
+sources -> sanitize -> documents(raw)
+                     -> enrich -> aspect_mentions + quality
+                     -> embed_text -> embedding provider -> Milvus
+                              PostgreSQL UUID <------------^ vector ID
 
-### Processing State Contract
-- `documents.processing_status` progresses through `raw` → `enriched` → `embedded`; a per-document extraction or embedding error moves only that document to `failed` with `processing_error` populated.
-- The worker fetches only raw documents belonging to dashboard-enabled SKUs. The explicit acceptance runner accepts only caller-supplied raw UUIDs and rejects duplicate or non-raw input.
-- Extraction accepts at most three evidence-grounded aspects per review. `mention_text` must be an exact review substring (≤60 characters); quality is calculated before persistence.
-- Model-supplied `context_window` is limited to 200 characters. If the model returns an oversized context for an otherwise valid mention, the pipeline rebuilds a bounded context from the exact review evidence rather than discarding the mention.
-- `embed_text` is persisted in PostgreSQL before the document advances to `embedded`. Milvus upserts use `aspect_mentions.id` as the vector ID and carry `sku_code`, `aspect_label`, `sentiment`, `week_id`, and `quality_score` metadata.
+PostgreSQL/Milvus -> repositories/services -> FastAPI -> Next.js
+                                            -> controlled Agent -> SSE
+independent APScheduler worker -> weekly pipeline (Sunday 02:00 UTC)
+```
 
-### Operational Validation
-- The Week 2 acceptance runner processed one selected document for each locked SKU in a controlled network environment.
-- Final acceptance produced 10 `aspect_mentions` and 10 Milvus vectors for the five documents. UUID, scalar metadata, evidence, quality, and `embed_text` checks passed with no missing or orphan vectors.
-- Dashboard aggregates are served by `GET /api/weeks`, `GET /api/overview`, and `GET /api/skus/{sku_code}/trends`; only dashboard-enabled SKUs and mentions meeting the configured quality threshold are included.
+PostgreSQL is the relational source of truth. A Milvus hit is never exposed as
+evidence by itself: the backend hydrates its UUID from PostgreSQL and validates
+the relational record. `aspect_mentions.id` and the Milvus primary key are the
+same UUID.
 
-## 4. Implemented Agent Design & Tool Boundaries
+## Data model and pipeline
 
-The Agent uses a pure handwritten function-calling loop with a hard maximum of three attempted tool calls. Tools are composable; there is no mutually exclusive priority chain.
+Alembic manages seven core tables: `skus`, `documents`, `aspect_mentions`,
+`weekly_reports`, `weekly_topics`, `chat_sessions`, and `chat_messages`.
+Documents advance through `raw`, `enriched`, and `embedded`; failures remain
+isolated and record an error. The catalog is deliberately limited to the five
+codes in `pipelines/config/targets.py`.
 
-- **`tool_report`** reads existing `weekly_reports` only. A missing report returns `not_found`; the Router may then choose analytics and/or RAG. It never generates a replacement report.
-- **`tool_sql`** exposes only six fixed deterministic operations: review count, sentiment distribution, aspect distribution, trend, aspect trend, and SKU comparison. It never accepts arbitrary SQL. Application code enforces dashboard-enabled SKUs, the shared quality threshold, same-`capacity_tier` comparison, and configurable low-sample warnings.
-- **`tool_rag`** accepts structured query, SKU, week, sentiment, aspect, and `top_k` arguments. Application code validates locked/dashboard-enabled SKUs, taxonomy, ISO weeks, maximum `top_k`, and quality filtering before Milvus/PostgreSQL retrieval.
+Reddit ingestion uses PRAW. Amazon ingestion uses a local/static McAuley review
+dataset. Presidio removes PII before persistence and authors are represented by
+a hash. Enrichment accepts only canonical aspects, limits extracted evidence
+to exact source substrings, and computes quality in deterministic code.
+Dashboard and RAG reads share `ASPECT_QUALITY_THRESHOLD` (default `0.55`). The
+text embedded for retrieval is persisted as `embed_text`, allowing vector
+inputs to be audited.
 
-The LLM may interpret intent, regenerate explicit tool arguments from visible recent messages, select and sequence approved tools, synthesize supported output, and identify cited evidence IDs. Deterministic code owns validation, calculation, business constraints, provenance, persistence, and streaming serialization.
+`EMBEDDING_DIMENSIONS` defaults to 1024 and is one contract spanning provider
+output, the application, and the Milvus schema. API startup probes the provider
+and validates an existing collection before accepting traffic. The worker is a
+separate process and APScheduler invokes the weekly pipeline every Sunday at
+02:00 UTC with `max_instances=1` and `coalesce=True`.
 
-### Evidence, conversation, and failure behavior
+## Backend and public contracts
 
-- Provenance remains `Milvus vector id == aspect_mentions.id -> documents.id`; no second ID mapping exists.
-- Retrieved evidence and final citations are distinct. Only evidence IDs actually referenced in the final answer are emitted. Citations provide an exact preview plus stable source metadata for expansion.
-- Conversation context loads the most recent configurable N messages (default 8). No hidden active SKU/week/aspect/sentiment state or session summarization exists.
-- No-data requests abstain instead of using model prior knowledge. A failed tool may produce a disclosed partial answer only when another successful result materially supports it.
-- SSE emits real-time `tool_started`/`tool_completed`, then final `answer_delta`, used `citation` events, and `done`; request-level failures end with structured `error`. Successful final events are sent only after the chat transaction commits.
-- Reliability errors are normalized into safe structured categories. Tool errors retain compact code/retryability metadata; LLM failures use `llm_timeout` or `llm_request_failed`, and embedding timeouts use `rag_embedding_timeout`. Provider exception text, stack traces, and hidden reasoning are never streamed or persisted.
+The API routes are mounted directly under `/api`:
 
-### Week 3 acceptance status
+| Method and path | Auth | Contract |
+| --- | --- | --- |
+| `GET /health` | No | PostgreSQL health and runtime metadata. |
+| `POST /api/auth/login` | No | Exchange the configured admin password for a JWT. |
+| `GET /api/auth/me` | Yes | Validate the JWT and return the current principal. |
+| `GET /api/weeks` | No | Available ISO weeks. |
+| `GET /api/overview` | No | Portfolio and per-SKU weekly summary. |
+| `GET /api/skus` | No | Locked SKU metadata. |
+| `GET /api/skus/{sku_code}` | No | SKU detail for a week. |
+| `GET /api/skus/{sku_code}/evidence` | No | Paginated, quality-filtered evidence. |
+| `GET /api/skus/{sku_code}/trends` | No | Weekly SKU trend series. |
+| `GET /api/compare` | No | Two-to-three same-tier SKU comparison. |
+| `GET /api/reports/{week_id}` | No | Persisted weekly report or not-found response. |
+| `POST /api/reports/generate` | Yes | Generate/regenerate a report over SSE. |
+| `POST /api/ask` | Yes | Run a controlled Agent turn over SSE. |
 
-- The deterministic 19-query smoke/golden set covers quantitative, trend, same-tier and cross-tier comparison, evidence, combined SQL+RAG, recent-message follow-up, no-data, and fallback behavior.
-- The final Week 3 regression run preserves the validated Week 2 processing pipeline, embedding dimension contract, PostgreSQL/Milvus UUID alignment, dashboard APIs, shared quality filtering, and independent APScheduler worker process.
-- Live end-to-end validation passed against the configured Zhipu LLM and embedding provider with local Milvus and PostgreSQL: an authenticated `POST /api/ask` RAG request returned HTTP 200, `tool_rag:success`, one grounded SSE citation, and `done:success`.
-- The live citation's `mention_id` was verified as an `aspect_mentions.id` whose `document_id` matched the cited `documents.id`; its source URL and evidence preview were present. The request executed one tool call, within the maximum of three.
+Request/response models are Pydantic schemas in `backend/app/schemas`. Database
+access remains behind repositories. The comparison service is authoritative
+for capacity tiers and rejects mixed-tier requests even if a client or model
+requests them. Analytics, thresholds, counts, percentages, low-sample warnings,
+and validation are deterministic; the LLM only routes and synthesizes.
 
-## 5. Storage & Schema Contracts
+`API_PREFIX` is retained in settings for compatibility but is not used to
+remount these current paths.
 
-### Database Choices
-- **RDBMS**: PostgreSQL 15. Managed by Alembic (`env.py` configured with `run_async_migrations`).
-- **Vector DB**: Milvus 2.x (Docker). Uses Hybrid Search (Vector + Scalar Metadata filtering).
-- **Embedding Contract**: Zhipu `embedding-3` via `https://open.bigmodel.cn/api/paas/v4/`; dimension is sourced only from `EMBEDDING_DIMENSIONS` (currently 1024) and must match both API output and the Milvus vector field.
+## Controlled Agent and tool boundaries
 
-### Cross-System Joining & Mapping
-- **Milvus Granularity**: Sentence/Aspect level.
-- **Primary Key Alignment**: The UUID in `aspect_mentions.id` (PostgreSQL) is strictly used as the vector `id` in Milvus. No redundant data stored in Milvus.
-- **Cross-system Join Key**: `sku_code` (Slug format, e.g., `ecoflow-delta2`).
+`backend/app/agent/router.py` implements a pure function-calling loop. It has
+no framework-managed memory and no hidden state. The hard limits are three
+attempted tools, eight model rounds, duplicate-call protection, and one bounded
+grounding reprompt only when the model tries to answer before any tool call.
 
-### Target SKUs (Locked)
-1. `ecoflow-delta2` (1024Wh, mid) - Baseline for RAG verification.
-2. `jackery-explorer-1000` (1002Wh, mid) - Direct competitor for SQL join/trend testing.
-3. `jackery-explorer-240` (240Wh, entry) - High volume data (3653 reviews) for aggregation load testing.
-4. `jackery-explorer-300` (293Wh, entry) - Low volume data for fallback testing.
-5. `anker-solix-f2000` (2048Wh, large) - High-end semantic parsing test.
+- `tool_report` reads one already-persisted report. A missing report is an
+  explicit result which the Router may combine with other tools.
+- `tool_sql` accepts only six named operations: `review_count`,
+  `sentiment_distribution`, `aspect_distribution`, `trend`, `aspect_trend`,
+  and `compare_skus`. It never executes generated SQL.
+- `tool_rag` accepts a query plus validated SKU/week/aspect/sentiment/top-k
+  filters. It embeds the query, applies Milvus scalar filters, hydrates results
+  from PostgreSQL, rechecks provenance and quality, and returns bounded
+  evidence.
 
-### ER & Tables
-- `skus` (Contains `capacity_tier` to prevent cross-tier comparisons)
-- `documents` (Raw reviews, handles PII `author_hash`, UNIQUE `platform` + `external_id`; includes processing status/error fields for the Week 2 pipeline)
-- `aspect_mentions` (Granular aspects, mapped 1:1 with Milvus Vectors)
-- `weekly_reports` & `weekly_topics` (Summaries)
-- `chat_sessions` & `chat_messages`
-  - `chat_messages` stores `tool_calls` and `tool_results` as JSONB.
-  - *Decision*: `tool_results` only stores execution metadata (count/time), NOT the raw data payload, to save DB space and keep debugging clean.
+Provider-facing schemas expose the canonical aspect enum, while each tool
+revalidates inputs at its authoritative boundary. Partial tool failures are
+structured; no-data paths abstain instead of inventing support. Comparisons are
+neutral and inherit the same server-side capacity restriction as the dashboard.
 
-## 6. Week 4 Product Surfaces (Phases 0–10)
+Chat sessions/messages are persisted in PostgreSQL. On each turn, only the
+most recent visible user and assistant messages are supplied (default 8), with
+compact tool names/statuses/cited IDs. Raw payloads, summarized secret context,
+and implicit active SKU/week filters are not carried forward.
 
-- The Next.js app uses TanStack Query for dashboard server state, React Context for JWT session state, and local component state for visible filters and streamed content. Redux/Zustand were not added.
-- `/overview` consumes only public `GET /api/weeks`, `GET /api/overview`, and `GET /api/skus`. It does not calculate new business metrics or fabricate the unavailable portfolio-movement metric.
-- `/skus/[sku_code]` composes existing SKU detail, trend, and positive/negative evidence reads. It filters selectable weeks to the `skus_covered` values returned by the backend, and renders raw backend trend points rather than client-side aggregates.
-- `AnswerCitation` is the shared evidence view model. The reusable frontend evidence card exposes the exact evidence preview and expandable `mention_id`/`document_id` plus source metadata. This preserves `mention_id == aspect_mentions.id == Milvus vector id` traceability.
-- `/compare` limits SKU B to a dashboard-enabled SKU in SKU A's `capacity_tier`, but `GET /api/compare` remains the independent server-side constraint boundary. It composes existing comparison, detail, trend, and evidence reads; no comparison-specific backend or LLM service was introduced.
-- The comparison page may request a one-shot grounded summary through the existing authenticated `POST /api/ask` SSE endpoint. Its message explicitly names the visible SKU pair and ISO week; it introduces no hidden Agent filters or comparison memory. It renders only streamed answer deltas and Agent-emitted citations.
-- Phases 0–6 introduced no migrations, persistence-model changes, or new backend routes. Phase 7 adds authenticated `POST /api/reports/generate`: deterministic analytics and filtered RAG evidence are passed to a bounded report writer; the candidate is validated and only then inserted or atomically replaces the existing `(sku_id, week_id)` row. Failed generation, validation, persistence, or cancellation rolls back and leaves a prior report intact.
-- Report generation SSE emits `report_started`, stage lifecycle events, ordered candidate `report_delta` chunks, then `report_completed` only after commit; safe terminal `error` events never expose provider text or stack traces. The provider adapter remains completion-based, so candidate chunks are not provider-token streaming.
-- `weekly_reports` still has no durable report-to-mention relation. Report generation can use retrieved evidence for synthesis, but report-level interactive citations are not exposed or invented.
-- `/reports` retrieves an existing report for an explicit SKU/week and never generates on page load or refresh. Its Generate/Regenerate action consumes only the safe report SSE lifecycle, translates stages into user-facing progress, and replaces the visible report only after `report_completed`. Candidate deltas are never presented as persisted content; failed regeneration keeps the prior report visible.
-- `/ask` is protected by the existing authenticated app shell and streams only the established `POST /api/ask` contract. The browser keeps its visible messages locally and returns the committed `session_id` only for a follow-up; conversation context remains the server's recent-N messages with no hidden agent filters or state. Tool lifecycle events become friendly status text, while only Agent-emitted used citations are rendered in popovers with their evidence preview, platform, SKU, and week. Cancellation uses `AbortController`; structured errors and abstentions are shown safely without raw tool arguments, provider details, stack traces, or hidden reasoning.
-- The Phase 10 reliability pass adds local stream cancellation and terminal-event checks to the existing Ask, comparison-summary, and report-generation consumers. An unexpected stream close is a retryable user-facing failure, never a successful completion; cancelled report regeneration preserves the already persisted report. The app segment also has a safe retry boundary, auth bootstrap failures offer retry, and evidence/citation UI wraps long traceability fields without changing provenance.
+## SSE and persistence contracts
 
-## 7. Week 4 Evaluation (Phases 11–13)
+Ask success order is:
 
-- `shared/eval/semantic_golden.py` defines a separately curated 50-case semantic Golden dataset. It complements, rather than replaces, the 20-case deterministic Week 3 router regression suite.
-- `shared/eval/rag_eval.py` evaluates normal `AgentRunResult` objects or persisted observations. Deterministic checks enforce tool selection and bounds, numeric values, citation requirements and provenance, abstention, visible follow-up context, and cross-tier restrictions. Structured LLM judging is limited to answer correctness, retrieval relevance, citation groundedness, and unsupported-claim assessment.
-- An evaluation report retains every case, check, judge result or error, category, dimension score, and locked release gate. An unmeasured semantic gate is failed rather than averaged away; no failure is hidden behind a combined score.
-- The Phase 13 controlled executor (`shared/eval/fixture_execution.py`) is deliberately bound to the Golden fixtures, and `shared/eval/fixture_live_run.py` runs those observations through the configured LLM judge. This is repeatable evaluation infrastructure, not a replacement for live PostgreSQL/Milvus or browser release verification.
-- The final Phase 13 fixture/provider artifact is `artifacts/eval/phase13_fixture_live_judge.json`. It meets all locked gates, while retaining a non-blocking SG37 judge-quality review category; Phase 14 must still validate a clean live environment and browser product flows.
+```text
+tool_started -> tool_completed -> answer_delta* -> citation* -> done
+```
 
-## 8. Flowchart
+There may be multiple tool pairs. A terminal `error` replaces normal
+completion on failure. Citation objects are emitted only for evidence used in
+the answer and retain the PostgreSQL mention UUID/source metadata. The turn and
+its citations are committed before successful terminal events. Disconnects
+propagate cancellation instead of continuing unobserved work.
 
-    flowchart TD
-      %% Batch Pipeline (Worker Process)
-      subgraph Pipeline [APScheduler Worker Process]
-        A[Ingest: Reddit/Amazon] --> B[Sanitize: Presidio PII]
-        B --> C[Enrich: Aspect/Sentiment]
-        C --> D{Storage Router}
-        D -->|embedding-3 / Dim=1024| E[(Milvus Vector DB)]
-        D -->|Sync UUID| F[(PostgreSQL)]
-      end
+Report generation success order is:
 
-      %% Real-time User Interaction (API Process; /api/ask requires JWT)
-      subgraph Interaction [FastAPI Process]
-        U((User)) -->|Ask: 'Delta 2 noise?'| H[Next.js Frontend]
-        H -->|POST /api/ask| I[Pure Function Calling Router]
-        
-        I -->|Stored macro report| J[tool_report]
-        I -->|Exact evidence| K[tool_rag]
-        I -->|Deterministic metrics| L[tool_sql]
-        
-        J --> F
-        K --> E
-        K -.->|Fetch full text by UUID| F
-        L --> F
-        
-        I --> M[Synthesize Answer with Citations]
-        M -->|Structured SSE + used citations| H
-      end
+```text
+report_started
+  -> stage_started -> stage_completed (analytics)
+  -> stage_started -> stage_completed (evidence)
+  -> stage_started -> stage_completed (synthesis)
+  -> report_delta*
+  -> report_completed
+```
+
+Analytics and RAG inputs are bounded and deterministic. The synthesized
+candidate is validated before any `report_delta`; chunks therefore improve UI
+delivery but are not token streaming and cannot prove persistence. A database
+transaction atomically creates/replaces the report before
+`report_completed`. Failure/cancellation leaves an older report intact. The
+current schema has no weekly-report-to-mention relation, so report citations
+are unavailable by design.
+
+## Frontend architecture
+
+Implemented routes are `/login`, `/overview`, `/skus/[sku_code]`, `/compare`,
+`/reports`, and `/ask`; `/` redirects. A shared application shell protects the
+authenticated UI and provides navigation and logout.
+
+- TanStack Query owns backend/server state and cache lifecycles.
+- React Context owns the JWT session and authentication bootstrap.
+- Components own transient selections, forms, stream progress, and popovers.
+- Axios attaches the token stored at `voc.access-token`.
+
+There is no Redux/Zustand store and no frontend shadow of Agent memory.
+`NEXT_PUBLIC_API_BASE_URL` is embedded when Next.js builds. Ask and report
+clients parse named SSE events, retain completed content, surface structured
+errors, and invalidate relevant Query caches after successful mutation.
+
+## Report and evaluation architecture
+
+Weekly report generation combines repository-backed deterministic analytics,
+quality-filtered RAG evidence, bounded LLM synthesis, schema/content
+validation, and atomic persistence. Reading a report and generating one are
+separate APIs and Agent `tool_report` remains read-only.
+
+Evaluation has three layers:
+
+1. Unit/integration regression tests verify pipeline states, embedding
+   dimensions, UUID provenance, quality filters, APIs, scheduler behavior,
+   report transactions, tools, Router behavior, SSE, and frontend state/UI.
+2. The Week 3 deterministic Agent suite covers quantitative, RAG, hybrid,
+   follow-up, abstention, comparison, and fallback behavior without relying on
+   provider interpretation.
+3. A 50-case semantic Golden dataset covers quantitative (7), trend (6),
+   comparison (7), evidence (10), hybrid (6), follow-up (5), abstention (5),
+   and report (4). Deterministic checks can evaluate captured observations;
+   the optional structured judge scores semantic answer/retrieval quality.
+
+Release gates are routing >=90%, answer correctness >=85%, retrieval relevance
+>=85%, citation groundedness >=95%, abstention >=90%, follow-up >=90%, numeric
+correctness 100%, and zero cross-tier, provenance, or critical unsupported
+claim violations. The saved Phase 13 artifact is a controlled fixture judged
+by the configured live provider, not 50 live database Agent runs. Phase 14 is a
+separate real PostgreSQL/Milvus/provider browser suite.
+
+## Preserved decisions and limitations
+
+- PostgreSQL remains authoritative; Milvus can be rebuilt from persisted
+  mention/embed data and vector IDs must equal mention UUIDs.
+- Deterministic business rules do not move into prompts. Capacity-tier checks
+  are enforced by services/tools, not trusted to the UI or model.
+- Citations require traceable, hydrated, used evidence. Report prose currently
+  lacks citation joins and must not be represented as citation-capable.
+- Recent-N visible conversation is the only conversational carry-over; adding
+  hidden Agent filters or memory would break the contract.
+- Authentication is one configured password plus browser-local JWT storage;
+  there is no multi-user/RBAC/tenant architecture.
+- Live sources/providers introduce network, credential, cost, and
+  nondeterminism constraints. The fixture and demo seed are development/release
+  aids, not production data initialization.
+- The fixed embedding dimension and old Milvus/PyMilvus compatibility pins
+  require a coordinated upgrade. Known dependency deprecation warnings remain.
+- Low-sample analytics warn but remain queryable; the MVP does not claim
+  statistical significance.

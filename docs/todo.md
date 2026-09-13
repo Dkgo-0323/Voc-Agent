@@ -48,12 +48,12 @@
 - [x] **Auth**: Configured single-password login, JWT verification, `/api/auth/me`, and protected `/api/ask`; dashboard routes remain public.
 - [x] **Reliability and Week 3 sign-off**:
   - [x] Structured tool/LLM/RAG error categories, controlled partial failures, and duplicate/call-limit guards.
-  - [x] Deterministic 19-query smoke/golden acceptance set covering quantitative, qualitative, combined, follow-up, no-data, comparison, and fallback behavior.
+  - [x] Deterministic 20-query smoke/golden acceptance set covering quantitative, qualitative, combined, follow-up, no-data, comparison, and fallback behavior.
   - [x] Week 2 regression verification: processing states, embedding dimension, UUID provenance, dashboard APIs, shared quality threshold, and independent APScheduler worker.
   - [x] Final documentation synchronization for the implemented controlled Agent design.
   - [x] Live authenticated RAG E2E verification with the configured Zhipu LLM and embedding provider, Milvus retrieval, PostgreSQL evidence hydration, SSE citation, and `done:success`.
 
-## Week 4: Frontend, Eval & Polish
+## Week 4: Frontend, Eval & Polish (✅ Completed)
 - [x] **Next.js Frontend Development**:
   - [x] Product foundation, JWT session flow, Overview, Level 2 SKU Detail, and same-tier Compare (Phases 1–6).
   - [x] Weekly Report viewer and explicit streamed generation (Phase 8).
@@ -67,10 +67,16 @@
   - [x] Write and validate the 50-query semantic Golden dataset (Phase 11).
   - [x] Implement the semantic evaluation framework with deterministic checks, structured LLM judge support, JSON output, and release gates (Phase 12).
   - [x] Run fixture-backed semantic evaluation, classify failures, and fix evaluation root causes without changing Agent behavior (Phase 13).
-- [ ] **Final Polish**:
+- [x] **Final Polish**:
   - [x] Phase 14 release verification: fresh PostgreSQL migration/seed, isolated
     Milvus fixture, backend/worker/frontend startup, browser E2E, and Week 1-3
     regressions.
   - [x] Add the reproducible setup and release-test commands required by the
     Phase 14 exit gate to `README.md`.
-  - [ ] Complete the broader Phase 15 documentation and demo-polish pass.
+  - [x] Complete the Phase 15 documentation and demo-polish pass: synchronize
+    the implementation architecture, exact run/evaluation commands, release
+    gates, limitations, and interview flow without adding product behavior.
+
+Week 4 closed after Phase 15. The verified release baseline and its limits are
+recorded in `week4_phase14_handoff.md`; the final documentation audit is in
+`week4_phase15_handoff.md`. No production-readiness claim is implied.
