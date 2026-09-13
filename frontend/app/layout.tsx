@@ -14,7 +14,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className="h-full antialiased">
+    // Browser translation extensions can inject attributes into <html> before
+    // React hydrates. Limit the warning suppression to this root element.
+    <html lang="en" className="h-full antialiased" suppressHydrationWarning>
       <body className="min-h-full bg-[var(--canvas)] text-[var(--ink)]">
         <QueryProvider><AuthProvider>{children}</AuthProvider></QueryProvider>
       </body>
