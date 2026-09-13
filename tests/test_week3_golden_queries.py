@@ -11,7 +11,7 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from typing import Any
-from uuid import NAMESPACE_URL, UUID, uuid5
+from uuid import NAMESPACE_URL, uuid5
 
 import pytest
 
@@ -54,7 +54,6 @@ from backend.app.agent.schemas import (
     TrendPoint,
     WeeklyReportPayload,
 )
-
 
 FIXTURE_WEEK = 202403
 FIXTURE_RANGE = {"start_week_id": 202402, "end_week_id": 202403}

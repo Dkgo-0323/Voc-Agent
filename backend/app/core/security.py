@@ -6,12 +6,11 @@ Week 1 仅建立结构，Week 2 接入鉴权中间件时完善。
 
 from datetime import UTC, datetime, timedelta
 from secrets import compare_digest
-from typing import Any
+from typing import Annotated, Any
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
-from jose import JWTError
-from jose import jwt
+from jose import JWTError, jwt
 from passlib.context import CryptContext
 
 from backend.app.core.settings import settings
@@ -72,7 +71,9 @@ def decode_access_token(token: str) -> dict[str, Any]:
 
 
 async def get_request_identity(
-    credentials: HTTPAuthorizationCredentials | None = Depends(bearer_scheme),
+    credentials: Annotated[
+        HTTPAuthorizationCredentials | None, Depends(bearer_scheme)
+    ],
 ) -> str:
     """Return the verified JWT subject for the small protected API surface."""
 

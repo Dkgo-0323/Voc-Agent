@@ -8,6 +8,7 @@ env/
 .env
 .pytest_cache/
 .pytest-tmp/
+.pytest-tmp-*/
 
 # Node
 node_modules/
