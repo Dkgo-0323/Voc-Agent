@@ -1,0 +1,3348 @@
+{
+  "dataset_id": "week4_semantic_golden_v1",
+  "generated_at": "2026-09-12T03:40:24.101681Z",
+  "results": [
+    {
+      "case_id": "SG01",
+      "category": "quantitative",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly reports the exact count of negative mentions (12) and the review denominator (8) as specified in the fixture."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG02",
+      "category": "quantitative",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly states the counts of noise and charging mentions as expected."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG03",
+      "category": "quantitative",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly uses the deterministic router fixture to provide the exact number of negative mentions, as required by the setup and numeric expectations, without any unsupported claims or citations."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG04",
+      "category": "quantitative",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The SQL tool correctly identified 5 negative charging mentions for Delta 2, matching the expected metric value."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG05",
+      "category": "quantitative",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The SQL tool correctly identified noise as the most mentioned negative aspect for the Delta 2, matching the expected 7 mentions."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG06",
+      "category": "quantitative",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The SQL tool returned the correct count of 12 Delta 2 VOC mentions for the specified week, adhering to the deterministic requirement without unsupported causal claims."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG07",
+      "category": "quantitative",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly states the negative rate for Delta 2 as 50%, matching the expected value and adhering to the requirement of using the comparison metric without declaring a product winner."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG08",
+      "category": "trend",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly describes the deterministic change in Delta 2 negative sentiment from 25% to 50% between the specified weeks, as requested, without using forbidden tools or citations."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG09",
+      "category": "trend",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly describes the noise trend as rising from 25% negative to 50% negative across the fixture weeks, using the deterministic router fixture as specified."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG10",
+      "category": "trend",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly states that Delta 2 negativity worsened because the calculated rate increased, matching the required characteristic of explaining the worsening due to the rate increase."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG11",
+      "category": "trend",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly compares the weekly negative rates for Delta 2 over 202402 and 202403, adhering to the requirement to include both time points and their rates."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG12",
+      "category": "trend",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly explains the limitation of the fixture's deterministic aspect-trend output, avoiding unsupported causal claims as required."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG13",
+      "category": "trend",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer is correct and deterministically supported by the SQL tool without causal speculation."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG14",
+      "category": "comparison",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly compares the negative rates of Delta 2 and Jackery Explorer 1000 for the same tier, as required by the fixture."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG15",
+      "category": "comparison",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly compares the negative rates of Delta 2 and Jackery Explorer 1000 without making unsupported claims or violating tool constraints."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG16",
+      "category": "comparison",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly compares noise levels for the specified SKUs using the deterministic router fixture, adhering to the same-tier requirement without unsupported claims or citations."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG17",
+      "category": "comparison",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": true,
+          "passed": true,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly explains the capacity-tier constraint and avoids a product verdict, adhering to the instructions."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG18",
+      "category": "comparison",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The SQL tool was correctly used without external knowledge, adhering to the fixture's constraints."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG19",
+      "category": "comparison",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly compares the deterministic negative mention counts for the two mid-tier SKUs and adheres to the requirement of retaining the low-sample caveat, without citing any external evidence."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG20",
+      "category": "comparison",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly states the observed metric (25% vs 50%) and includes the required caveat about the fixture sample, avoiding broad superiority claims."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG21",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves a negative noise level mention with an exact review excerpt citation from the fixture, meeting all requirements."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG22",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly quotes the retrieved evidence and provides a valid citation as required."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG23",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer is correct, retrieves relevant evidence about Delta 2 noise issues, and is properly cited."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG24",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves a Delta 2 complaint from the specified week and provides a hydrated, scope-matching mention with a valid citation."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG25",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves a negative review about the fan being very loud under load, which matches the required evidence characteristics."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG26",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves and cites evidence about the Jackery Explorer 1000 fan noise, adhering to the specified SKU filtering and citation requirements."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG27",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer is correct, retrieved evidence is highly relevant, and the citation is properly grounded."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG28",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves and cites evidence related to the Delta 2 charging experience, meeting all requirements without unsupported claims."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG29",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves and cites the exact evidence about the loud fan under load from the fixture."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG30",
+      "category": "evidence",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves and cites a Delta 2 complaint about the fan being very loud under load, meeting all requirements."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG31",
+      "category": "sql_rag_hybrid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], actual=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], allowed=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], executed=2."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly identifies 'noise' as the main complaint with 7 mentions, providing a relevant citation from the fixture data for Delta 2 in week 202403."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG32",
+      "category": "sql_rag_hybrid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], actual=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], allowed=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], executed=2."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly describes the calculated change in Delta 2 negativity and qualifies the explanation as evidence, not certainty, while citing relevant retrieved evidence."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG33",
+      "category": "sql_rag_hybrid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], actual=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], allowed=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], executed=2."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly identifies 'Noise' as the most common Delta 2 complaint category with 7 mentions, and provides a relevant citation from the fixture document."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG34",
+      "category": "sql_rag_hybrid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], actual=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], allowed=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], executed=2."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly compares the noise metrics of Delta 2 and Jackery 1000 using a retrieved customer example, and cites the source properly."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG35",
+      "category": "sql_rag_hybrid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], actual=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], allowed=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], executed=2."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly states the number of negative Delta 2 mentions as 12 and provides a supporting complaint with a valid citation."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG36",
+      "category": "sql_rag_hybrid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], actual=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], allowed=[<Tool.RAG: 'tool_rag'>, <Tool.SQL: 'tool_sql'>], executed=2."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly summarizes the negative mentions and noise mentions as specified, and provides a valid citation."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG37",
+      "category": "follow_up",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": true,
+          "passed": true,
+          "details": "visible scope expected=['ecoflow-delta2', 'jackery-explorer-1000'], routed=['ecoflow-delta2', 'jackery-explorer-1000']."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 0.5,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly references the two SKUs from the visible history but provides a specific numeric comparison for noise negativity that may not be directly supported by the provided SQL tool trace."
+      },
+      "judge_error": null,
+      "failure_categories": [
+        "grounding_citation"
+      ]
+    },
+    {
+      "case_id": "SG38",
+      "category": "follow_up",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": true,
+          "passed": true,
+          "details": "visible scope expected=['ecoflow-delta2', 'jackery-explorer-1000'], routed=['ecoflow-delta2', 'jackery-explorer-1000']."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves and cites a relevant comment about the fan being very loud under load, supporting the noise comparison topic."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG39",
+      "category": "follow_up",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": true,
+          "passed": true,
+          "details": "visible scope expected=['ecoflow-delta2'], routed=['ecoflow-delta2']."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly uses the deterministic SQL tool to resolve the query based on the visible Delta 2 context without external knowledge or citations, matching the numeric expectation."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG40",
+      "category": "follow_up",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Required citations must follow a successful RAG tool result."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": true,
+          "passed": true,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": true,
+          "passed": true,
+          "details": "visible scope expected=['ecoflow-delta2'], routed=['ecoflow-delta2']."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": 1.0,
+        "citation_groundedness": 1.0,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly retrieves and cites evidence from the deterministic router fixture, adhering to the requirement for traceable evidence."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG41",
+      "category": "follow_up",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": true,
+          "passed": true,
+          "details": "visible scope expected=['ecoflow-delta2', 'jackery-explorer-1000'], routed=['ecoflow-delta2', 'jackery-explorer-1000']."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly identifies the requested SKUs and specifies a deterministic trend comparison, adhering to the constraints."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG42",
+      "category": "no_data_abstention_invalid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": true,
+          "passed": true,
+          "details": "Abstention is required for this case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The response correctly abstains as per the case requirements, given the controlled fixture has no matching evidence."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG43",
+      "category": "no_data_abstention_invalid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": true,
+          "passed": true,
+          "details": "Abstention is required for this case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The abstention was correctly applied due to the strict positive noise filters producing no fixture evidence."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG44",
+      "category": "no_data_abstention_invalid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly surfaces the safe invalid-SKU outcome without making any product claims, adhering to the abstention requirement for unknown SKUs."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG45",
+      "category": "no_data_abstention_invalid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.RAG: 'tool_rag'>], actual=[<Tool.RAG: 'tool_rag'>], allowed=[<Tool.RAG: 'tool_rag'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly rejects the invalid ISO week without searching, adhering to the requirement to validate the week before external calls."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG46",
+      "category": "no_data_abstention_invalid",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.SQL: 'tool_sql'>], actual=[<Tool.SQL: 'tool_sql'>], allowed=[<Tool.SQL: 'tool_sql'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": true,
+          "passed": true,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly adheres to the schema limitation by rejecting the cross-tier request and not naming a winner."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG47",
+      "category": "report_related",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.REPORT: 'tool_report'>], actual=[<Tool.REPORT: 'tool_report'>], allowed=[<Tool.REPORT: 'tool_report'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly returns the stored report content verbatim as required, without regeneration or synthesis."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG48",
+      "category": "report_related",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.REPORT: 'tool_report'>, <Tool.SQL: 'tool_sql'>], actual=[<Tool.REPORT: 'tool_report'>, <Tool.SQL: 'tool_sql'>], allowed=[<Tool.RAG: 'tool_rag'>, <Tool.REPORT: 'tool_report'>, <Tool.SQL: 'tool_sql'>], executed=2."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": true,
+          "passed": true,
+          "details": "All expected numeric values were present."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly discloses the missing report and uses deterministic analytics as fallback, aligning with the instructions."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG49",
+      "category": "report_related",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.REPORT: 'tool_report'>], actual=[<Tool.REPORT: 'tool_report'>], allowed=[<Tool.REPORT: 'tool_report'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly adheres to the instruction to return a safe invalid-week result without generating a report, handling the invalid week ID error appropriately."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    },
+    {
+      "case_id": "SG50",
+      "category": "report_related",
+      "checks": [
+        {
+          "dimension": "routing_correctness",
+          "name": "approved_tool_selection",
+          "applicable": true,
+          "passed": true,
+          "details": "required=[<Tool.REPORT: 'tool_report'>], actual=[<Tool.REPORT: 'tool_report'>], allowed=[<Tool.REPORT: 'tool_report'>], executed=1."
+        },
+        {
+          "dimension": "numeric_correctness",
+          "name": "expected_numeric_values",
+          "applicable": false,
+          "passed": null,
+          "details": "Case has no deterministic numeric expectation."
+        },
+        {
+          "dimension": "citation_groundedness",
+          "name": "citation_requirement",
+          "applicable": true,
+          "passed": true,
+          "details": "Case forbids citations."
+        },
+        {
+          "dimension": "citation_provenance",
+          "name": "citation_provenance",
+          "applicable": false,
+          "passed": null,
+          "details": "Citations must retain unique mention IDs and matching source metadata."
+        },
+        {
+          "dimension": "abstention_correctness",
+          "name": "required_abstention",
+          "applicable": false,
+          "passed": null,
+          "details": "Not an abstention case."
+        },
+        {
+          "dimension": "follow_up_context_correctness",
+          "name": "visible_context_resolution",
+          "applicable": false,
+          "passed": null,
+          "details": "Not a follow-up case."
+        },
+        {
+          "dimension": "cross_tier_business_rule",
+          "name": "cross_tier_constraint",
+          "applicable": false,
+          "passed": null,
+          "details": "Cross-tier cases must disclose the constraint and never choose a winner."
+        }
+      ],
+      "judge": {
+        "answer_correctness": 1.0,
+        "retrieval_relevance": null,
+        "citation_groundedness": null,
+        "critical_unsupported_claim": false,
+        "rationale": "The answer correctly explains the limitation of stored reports regarding citations, as required by the human notes and setup."
+      },
+      "judge_error": null,
+      "failure_categories": []
+    }
+  ],
+  "dimensions": [
+    {
+      "dimension": "routing_correctness",
+      "applicable_cases": 50,
+      "passed_cases": 50,
+      "score": 1.0
+    },
+    {
+      "dimension": "abstention_correctness",
+      "applicable_cases": 2,
+      "passed_cases": 2,
+      "score": 1.0
+    },
+    {
+      "dimension": "follow_up_context_correctness",
+      "applicable_cases": 5,
+      "passed_cases": 5,
+      "score": 1.0
+    },
+    {
+      "dimension": "numeric_correctness",
+      "applicable_cases": 17,
+      "passed_cases": 17,
+      "score": 1.0
+    },
+    {
+      "dimension": "cross_tier_business_rule",
+      "applicable_cases": 2,
+      "passed_cases": 2,
+      "score": 1.0
+    },
+    {
+      "dimension": "citation_provenance",
+      "applicable_cases": 18,
+      "passed_cases": 18,
+      "score": 1.0
+    },
+    {
+      "dimension": "retrieval_relevance",
+      "applicable_cases": 17,
+      "passed_cases": 17,
+      "score": 1.0
+    },
+    {
+      "dimension": "answer_correctness",
+      "applicable_cases": 50,
+      "passed_cases": 50,
+      "score": 0.99
+    },
+    {
+      "dimension": "citation_groundedness",
+      "applicable_cases": 18,
+      "passed_cases": 18,
+      "score": 1.0
+    },
+    {
+      "dimension": "critical_unsupported_claim",
+      "applicable_cases": 50,
+      "passed_cases": 50,
+      "score": 1.0
+    }
+  ],
+  "gates": [
+    {
+      "name": "Tool / routing correctness",
+      "threshold": 0.9,
+      "actual": 1.0,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Answer correctness",
+      "threshold": 0.85,
+      "actual": 0.99,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Retrieval relevance",
+      "threshold": 0.85,
+      "actual": 1.0,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Citation groundedness",
+      "threshold": 0.95,
+      "actual": 1.0,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Abstention correctness",
+      "threshold": 0.9,
+      "actual": 1.0,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Follow-up context correctness",
+      "threshold": 0.9,
+      "actual": 1.0,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Deterministic numeric correctness",
+      "threshold": 1.0,
+      "actual": 1.0,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Cross-tier business-rule violations",
+      "threshold": 0,
+      "actual": 0,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Citation provenance violations",
+      "threshold": 0,
+      "actual": 0,
+      "passed": true,
+      "measured": true
+    },
+    {
+      "name": "Critical unsupported claims",
+      "threshold": 0,
+      "actual": 0,
+      "passed": true,
+      "measured": true
+    }
+  ],
+  "failures_by_category": {
+    "grounding_citation": [
+      "SG37"
+    ]
+  },
+  "overall_passed": true
+}

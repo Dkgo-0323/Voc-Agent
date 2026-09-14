@@ -6,13 +6,23 @@ __pycache__/
 venv/
 env/
 .env
+.pytest_cache/
+.pytest-tmp/
+.pytest-tmp-*/
 
 # Node
 node_modules/
 .next/
 dist/
+test-results/
+playwright-report/
 
 # IDE / OS
 .vscode/
 .idea/
 .DS_Store
+
+
+# Data directories
+data/
+*.jsonl
