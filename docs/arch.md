@@ -143,6 +143,10 @@ transaction atomically creates/replaces the report before
 `report_completed`. Failure/cancellation leaves an older report intact. The
 current schema has no weekly-report-to-mention relation, so report citations
 are unavailable by design.
+Generated report bodies and summaries reject UUIDs, HTTP(S) URLs, and the
+Evidence/Citations heading before streaming or persistence. This is a format
+boundary, not claim-level factual verification. See
+`docs/report_evidence_regression.md` for reproducible scenarios and limitations.
 
 ## Frontend architecture
 

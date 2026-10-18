@@ -115,6 +115,11 @@ class FakeRag:
         )
 
 
+class EmptyRag:
+    async def execute(self, arguments):
+        return SimpleNamespace(status=ToolStatus.EMPTY, payload=None, error=None)
+
+
 class FakeModel:
     def __init__(self, content: str | None = None) -> None:
         self.content = content or _candidate_json()
@@ -285,5 +290,48 @@ async def test_stream_validation_failure_is_terminal_and_never_commits():
 
     assert events[-1] == "error"
     assert "report_completed" not in events
+    assert transaction.commits == 0
+    assert transaction.rollbacks == 1
+
+
+@pytest.mark.asyncio
+async def test_no_retrieved_evidence_keeps_metrics_and_explicit_warnings():
+    model = FakeModel()
+    service = ReportGenerationService(FakeRepository(), FakeAnalytics(), EmptyRag(), model)
+    arguments = GenerateReportArguments(sku_code="ecoflow-delta2", week_id=202635)
+    facts = await service.retrieve_evidence(await service.collect_analytics(arguments))
+
+    assert facts["evidence"] == []
+    assert facts["metrics"]["review_count"]["review_count"] == 12
+    assert facts["warnings"] == [
+        "No positive representative evidence was retrieved.",
+        "No negative representative evidence was retrieved.",
+    ]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("field", ["report_md", "summary"])
+@pytest.mark.parametrize("reference", [
+    "11111111-1111-4111-8111-111111111111",
+    "https://example.test/review/1",
+    "## Evidence/Citations",
+])
+async def test_report_without_evidence_relation_rejects_model_references(field, reference):
+    content = json.loads(_candidate_json())
+    content[field] += "\n" + reference
+    repository = FakeRepository()
+    transaction = FakeTransaction()
+    events = await _stream_event_types(
+        payload=GenerateReportArguments(sku_code="ecoflow-delta2", week_id=202635),
+        service=_service(repository=repository, model=FakeModel(json.dumps(content))),
+        request=FakeRequest(),
+        transaction=transaction,
+    )
+
+    assert events[-1] == "error"
+    assert "report_delta" not in events
+    assert "report_completed" not in events
+    assert "citation" not in events
+    assert repository.saved == []
     assert transaction.commits == 0
     assert transaction.rollbacks == 1

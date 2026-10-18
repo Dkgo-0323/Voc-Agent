@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import re
 from datetime import date
 from typing import Any, Protocol
 
@@ -48,6 +49,17 @@ class ReportCandidate(BaseModel):
 
     report_md: str = Field(min_length=120, max_length=16_000)
     summary: str = Field(min_length=20, max_length=1_200)
+
+    @field_validator("report_md", "summary")
+    @classmethod
+    def reject_unsupported_references(cls, value: str) -> str:
+        # Reports have no durable mention join, even when RAG supplied examples.
+        if re.search(
+            r"(?i)[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}|https?://|##\s*Evidence\s*/\s*Citations",
+            value,
+        ):
+            raise ValueError("weekly reports do not support evidence references")
+        return value
 
     @field_validator("report_md")
     @classmethod

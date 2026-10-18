@@ -1,3 +1,4 @@
+from dataclasses import replace
 from datetime import datetime
 from typing import Any
 from uuid import UUID, uuid4
@@ -161,6 +162,53 @@ async def test_delta2_noise_returns_exact_traceable_evidence() -> None:
     assert evidence.mention_id == hit.id == row.mention_id
     assert evidence.mention_text == "fan is extremely loud"
     assert evidence.mention_text in evidence.source.review_text
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("hydrated", [True, False], ids=["verified-evidence", "unhydrated-hit"])
+async def test_report_evidence_provenance_requires_relational_hydration(hydrated):
+    """A vector UUID alone is never a customer citation, including report inputs."""
+    hit, row = evidence_pair(
+        aspect_label="charging_speed",
+        sentiment="negative",
+        week_id=202635,
+        mention_text="charging stopped unexpectedly",
+    )
+    mention_id = UUID("11111111-1111-4111-8111-111111111111")
+    hit = replace(hit, id=mention_id)
+    row = row.model_copy(update={"mention_id": mention_id})
+    service, repository, _, _ = service_for([(hit, row)])
+    if not hydrated:
+        repository.rows.clear()
+
+    result = await service.execute(
+        RagToolArguments(
+            query="representative customer complaint or limitation",
+            sku_codes=[row.sku_code],
+            week_range=WeekRange(start_week_id=202635, end_week_id=202635),
+            sentiment="negative",
+            top_k=2,
+        )
+    )
+
+    evidence = result.payload.evidence if result.payload else []
+    assert repository.hydration_calls
+    if hydrated:
+        assert result.status is ToolStatus.SUCCESS
+        citations = build_answer_citations(evidence, [row.mention_id])
+        assert citations[0].document_id == row.document_id
+        assert citations[0].source.source_url == row.source_url
+        assert citations[0].evidence_preview in row.review_text
+        with pytest.raises(ValueError, match="not retrieved"):
+            build_answer_citations(
+                evidence, [UUID("22222222-2222-4222-8222-222222222222")]
+            )
+    else:
+        assert result.status is ToolStatus.EMPTY
+        assert evidence == []
+        assert build_answer_citations(evidence, []) == []
+        with pytest.raises(ValueError, match="not retrieved"):
+            build_answer_citations(evidence, [hit.id])
 
 
 @pytest.mark.asyncio
