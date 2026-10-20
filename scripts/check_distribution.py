@@ -103,7 +103,9 @@ def main() -> None:
     # -I removes checkout/PYTHONPATH imports. An empty cwd also prevents .env reads.
     with tempfile.TemporaryDirectory(prefix="voc-distribution-") as directory:
         subprocess.run(
-            [str(Path(args.python).resolve()), "-I", "-c", IMPORT_CHECK],
+            # Resolving a POSIX venv symlink selects the base interpreter and
+            # loses the installed wheel's site-packages. Make only cwd absolute.
+            [str(Path(args.python).absolute()), "-I", "-c", IMPORT_CHECK],
             cwd=directory,
             env=environment,
             check=True,
