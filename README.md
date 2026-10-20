@@ -219,8 +219,8 @@ at `http://127.0.0.1:8000/health`; development OpenAPI is at `/docs`.
 Run deterministic backend and frontend checks:
 
 ```powershell
-uv run ruff check backend pipelines scripts tests conftest.py
-uv run pytest -q
+uv run ruff check backend pipelines shared scripts tests conftest.py
+uv run python scripts/run_backend_tests.py
 
 Push-Location frontend
 npm run lint
@@ -229,6 +229,13 @@ npm test
 npm run build
 Pop-Location
 ```
+
+The backend test entry point isolates local `.env` files and inherited application
+settings. The frontend type check generates Next.js route types before invoking
+TypeScript, so it also works from a clean checkout. See
+[delivery verification](docs/development/verification.md) for locked installation,
+installed-wheel smoke checks, CI commands, and the boundary between deterministic
+checks and real-service validation.
 
 The Phase 14 Playwright suite uses a migrated disposable PostgreSQL database,
 a dedicated Milvus collection, real configured providers, and ports 8014/3014.
