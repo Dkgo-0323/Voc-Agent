@@ -1,0 +1,47 @@
+name: Backend CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      UV_LINK_MODE: copy
+      UV_NO_PROGRESS: "1"
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Set up uv and Python
+        uses: astral-sh/setup-uv@c771a70e6277c0a99b617c7a806ffedaca235ff9 # v9.0.0
+        with:
+          version: "0.11.8"
+          python-version: "3.12"
+          enable-cache: true
+          cache-dependency-glob: uv.lock
+      - name: Install locked dependencies without the source package
+        run: uv sync --locked --extra dev --no-install-project
+      - name: Lint
+        run: uv run --no-sync ruff check backend pipelines shared scripts tests conftest.py
+      - name: Run deterministic tests without local configuration
+        run: uv run --no-sync python scripts/run_backend_tests.py
+      - name: Build wheel
+        run: uv build --wheel --out-dir dist/release
+      - name: Install the built wheel
+        run: uv pip install --python .venv/bin/python --no-deps dist/release/*.whl
+      - name: Check wheel contents and installed imports
+        run: uv run --no-sync python scripts/check_distribution.py dist/release/*.whl --python .venv/bin/python
