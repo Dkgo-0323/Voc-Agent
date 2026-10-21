@@ -28,6 +28,8 @@ jobs:
         run: |
           docker run --rm --network none --entrypoint python voc-agent-backend:local -c "import os; assert os.getuid() != 0"
           docker run --rm --network none --entrypoint alembic voc-agent-backend:local -c /app/alembic.ini history
+      - name: Validate isolated application Compose
+        run: docker compose --env-file ops/compose.empty.env -f ops/docker-compose.yml config --quiet
   frontend-image:
     runs-on: ubuntu-latest
     timeout-minutes: 15

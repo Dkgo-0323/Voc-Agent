@@ -1,0 +1,138 @@
+name: voc-local
+
+x-app: &app
+  image: voc-agent-backend:local
+  build:
+    context: ..
+    dockerfile: ops/Dockerfile.backend
+    args:
+      PYTHON_IMAGE: ${VOC_PYTHON_IMAGE:-python:3.12-slim-bookworm}
+  environment: &app-environment
+    APP_ENV: development
+    DATABASE_URL: postgresql+asyncpg://voc:local-container-only@postgres:5432/voc
+    MILVUS_HOST: milvus
+    MILVUS_PORT: "19530"
+    MILVUS_COLLECTION_NAME: container_mentions_1024
+    EMBEDDING_DIMENSIONS: "1024"
+    EMBEDDING_API_KEY: ${VOC_EMBEDDING_API_KEY:-}
+    EMBEDDING_BASE_URL: ${VOC_EMBEDDING_BASE_URL:-http://provider-not-configured.invalid/v1}
+    LLM_API_KEY: ""
+    OPENAI_API_KEY: ""
+    LLM_BASE_URL: http://provider-not-configured.invalid/v1
+    JWT_SECRET_KEY: local-container-only-not-for-production
+    ADMIN_PASSWORD: local-container-only
+  security_opt: [no-new-privileges:true]
+  cap_drop: [ALL]
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: voc
+      POSTGRES_PASSWORD: local-container-only
+      POSTGRES_DB: voc
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U voc -d voc]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  etcd:
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      ETCD_AUTO_COMPACTION_MODE: revision
+      ETCD_AUTO_COMPACTION_RETENTION: "1000"
+      ETCD_QUOTA_BACKEND_BYTES: "4294967296"
+      ETCD_SNAPSHOT_COUNT: "50000"
+    command: [etcd, --advertise-client-urls=http://127.0.0.1:2379, --listen-client-urls=http://0.0.0.0:2379, --data-dir=/etcd]
+    volumes: [etcd_data:/etcd]
+    healthcheck:
+      test: [CMD, etcdctl, endpoint, health]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  minio:
+    image: minio/minio:RELEASE.2023-03-13T19-46-17Z
+    environment:
+      MINIO_ACCESS_KEY: minioadmin
+      MINIO_SECRET_KEY: minioadmin
+    command: [minio, server, /minio_data, --console-address, ':9001']
+    volumes: [minio_data:/minio_data]
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:9000/minio/health/live]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+
+  milvus:
+    image: milvusdb/milvus:v2.3.4
+    command: [milvus, run, standalone]
+    environment:
+      ETCD_ENDPOINTS: etcd:2379
+      MINIO_ADDRESS: minio:9000
+      MINIO_ACCESS_KEY_ID: minioadmin
+      MINIO_SECRET_ACCESS_KEY: minioadmin
+    volumes: [milvus_data:/var/lib/milvus]
+    depends_on:
+      etcd: {condition: service_healthy}
+      minio: {condition: service_healthy}
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:9091/healthz]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 36
+
+  init:
+    <<: *app
+    command: [sh, -ec, 'alembic -c /app/alembic.ini upgrade head && python -m backend.app.db.seed']
+    depends_on:
+      postgres: {condition: service_healthy}
+    restart: "no"
+
+  api:
+    <<: *app
+    depends_on:
+      init: {condition: service_completed_successfully}
+      milvus: {condition: service_healthy}
+    ports: ["127.0.0.1:${VOC_API_PORT:-18000}:8000"]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)"]
+      interval: 5s
+      timeout: 5s
+      start_period: 20s
+      retries: 30
+
+  worker:
+    <<: *app
+    profiles: [worker]
+    command: [python, -m, backend.worker.main]
+    depends_on:
+      init: {condition: service_completed_successfully}
+      milvus: {condition: service_healthy}
+
+  web:
+    image: voc-agent-frontend:local
+    build:
+      context: ../frontend
+      args:
+        NODE_IMAGE: ${VOC_NODE_IMAGE:-node:22-bookworm-slim}
+        NEXT_PUBLIC_API_BASE_URL: http://127.0.0.1:${VOC_API_PORT:-18000}
+    ports: ["127.0.0.1:${VOC_WEB_PORT:-13000}:3000"]
+    depends_on:
+      api: {condition: service_healthy}
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, node, -e, "fetch('http://127.0.0.1:3000/overview').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  postgres_data:
+  etcd_data:
+  minio_data:
+  milvus_data:
