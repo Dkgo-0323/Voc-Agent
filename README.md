@@ -109,6 +109,11 @@ traceable.
 
 ## Prerequisites
 
+For isolated container startup without real model credentials, see the
+[container delivery guide](ops/README.md). It builds non-root Python/Next.js
+images and tests startup/failure recovery with an explicitly fake embedding
+provider; this does not validate Ask/report quality or public deployment.
+
 - Python 3.11 or newer and [uv](https://docs.astral.sh/uv/)
 - Node.js 20 or newer with npm
 - Docker Desktop with Compose

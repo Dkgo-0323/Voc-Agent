@@ -81,4 +81,16 @@ wheel 包含 `backend`、`pipelines`、`shared`；Hatchling 固定为 1.32.4。�
 
 这部分继续沿用 README 的隔离数据库/collection 和 provider 说明。API 必须满足迁移、基础 seed、锁定 SKU、Milvus 与维度契约后才能启动；仅检查 YAML 或单测通过不能替代真实启动。现有 Playwright API 命令是 Windows 路径，不能直接移到 Linux 门禁；后续单独做跨平台改造。不得将 CI 临时资源清理命令用于用户现有卷或数据库。
 
-镜像与编排留待 Docker 可用后推进；真实模型调用、凭据配置、付费资源和公网发布按确认范围执行。
+10-20 时镜像与编排尚未验证；10-21 新增的容器启动门禁见下节。真实模型调用、凭据配置、付费资源和公网发布按确认范围执行。
+
+## 容器启动与失败恢复（10-21 新增）
+
+操作与边界见 [ops 运行手册](../../ops/README.md)，确认取舍见 [ADR 0001](decisions/0001-container-startup-contract.md)。从仓库根执行：
+
+```sh
+python scripts/run_container_smoke.py --build
+```
+
+使用独立随机项目与空 env-file，内部测试网络、测试 embedding 服务；覆盖正常启动、重复迁移/seed、1024/768 维契约、init 失败阻断与恢复、登录/空 dashboard/CORS 和前端静态资源。只清理自己新建的项目和卷，不操作根 Compose 或旧数据。完整命令和端口变化后的重建方式在 ops 手册。
+
+该流程进入独立的 [Container delivery workflow](../../.github/workflows/containers-ci.yml)，不需要模型密钥。原普通双端 CI 依旧不启动存储或 provider；容器 CI 的通过也只证明测试依赖下的启动契约，不能代替真实模型、Ask/报告效果、调度任务运行、Playwright 浏览器交互或公网验收。本地 Docker Hub/ECR 下载失败与远端验收分别记录在 [10-21 daily](daily/2026-10-21.md)，不要把远端通过写成本地已能复跑。
