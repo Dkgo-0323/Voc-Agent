@@ -8,6 +8,7 @@ from urllib.request import Request, urlopen
 import pytest
 
 from ops.smoke.provider import Handler, state
+from scripts.run_container_smoke import request
 
 
 @pytest.fixture
@@ -48,3 +49,8 @@ def test_wrong_dimension_is_explicitly_controllable(provider):
     assert len(data["data"][0]["embedding"]) == 768
     with urlopen(provider + "/stats", timeout=3) as response:
         assert json.load(response)["embedding_requests"] == 1
+
+
+def test_unexpected_http_status_has_readable_diagnostic(provider):
+    with pytest.raises(AssertionError, match="GET .*expected 400, got 200"):
+        request(provider + "/health", status=400)

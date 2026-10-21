@@ -50,7 +50,7 @@ def request(url: str, *, body=None, token=None, status=200):
     with response:
         if response.status != status:
             raise AssertionError(
-                f"{req.method} {url}: expected {status}, got {response.status}"
+                f"{req.get_method()} {url}: expected {status}, got {response.status}"
             )
         data = response.read()
         return (

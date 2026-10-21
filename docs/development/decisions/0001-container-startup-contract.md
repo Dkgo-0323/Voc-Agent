@@ -21,3 +21,7 @@
 - 同源代理或运行时 API URL 注入增加部署灵活性，也增加本次范围；留待公网设计。
 - 测试 provider 无需真实密钥且可重复触发错误；不能把测试向量用于真实检索，不能替代 ENG-05B。
 - 不升级现有 Milvus/Postgres 或引入队列、Agent 框架；不对旧卷执行迁移/seed/清理。
+
+## 实施发现：MinIO 旧镜像已不可拉取
+
+首次完整 Linux CI 因旧 `minio/minio:RELEASE.2023-03-13T19-46-17Z` pull denied 失败，同标签 Quay manifest 也不存在。核对 [Milvus 官方开发 Compose](https://github.com/milvus-io/milvus/blob/06dec9a0e063aa9853da2000e555888fb491cb39/deployments/docker/dev/docker-compose.yml) 后，新 ops 编排改用其维护的 `milvusdb/minio:RELEASE.2024-12-18T13-15-44Z` 和 `mc ready local` 健康检查。这是新隔离环境的兼容性修复，不改变根 Compose、旧 MinIO、Milvus/Postgres 版本或任何旧卷。兼容性必须由实际 smoke 验证，不能仅凭上游使用记录认定通过。
