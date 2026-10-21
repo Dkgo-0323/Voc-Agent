@@ -1,0 +1,16 @@
+# Backend build context is an allowlist: never send local data or credentials.
+**
+!pyproject.toml
+!uv.lock
+!alembic.ini
+!backend/
+!backend/**
+!pipelines/
+!pipelines/**
+!shared/
+!shared/**
+!scripts/
+!scripts/check_distribution.py
+**/__pycache__/
+**/*.py[cod]
+**/.env*

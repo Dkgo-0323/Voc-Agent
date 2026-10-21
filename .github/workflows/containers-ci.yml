@@ -1,0 +1,30 @@
+name: Container delivery
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: containers-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build and verify installed runtime
+        run: docker build -f ops/Dockerfile.backend -t voc-agent-backend:local .
+      - name: Verify non-root installed migrations without services
+        run: |
+          docker run --rm --network none --entrypoint python voc-agent-backend:local -c "import os; assert os.getuid() != 0"
+          docker run --rm --network none --entrypoint alembic voc-agent-backend:local -c /app/alembic.ini history
