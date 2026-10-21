@@ -1,3 +1,5 @@
+> 历史快照：2026-10-21起停止日常维护。最新目标与状态见 [plan.md](plan.md)，周报/每日交付见 [journal.md](journal.md)。下方保留迁移前记录，不覆盖新工作流。
+
 # 当前仓库状态
 
 更新：2026-10-21。**今日方案 A 已完成并通过 Linux 实际验收**；完整 SHA、失败修复与命令见 [10-21 daily](daily/2026-10-21.md)。操作见 [验证入口](verification.md)、[容器手册](../../ops/README.md)；架构边界见 [ADR 0001](decisions/0001-container-startup-contract.md)。

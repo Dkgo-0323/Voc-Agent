@@ -326,3 +326,12 @@ are in `docs/week4_phase13_handoff.md` and `docs/week4_phase14_handoff.md`.
   local demo, not a hardened browser-session design.
 - PyMilvus 2.3 and current test dependencies emit known deprecation warnings.
   Their versions are constrained for compatibility with Milvus 2.3.4.
+
+
+## Development workflow
+
+Current phase, acceptance goals and priorities live in the [development plan](docs/development/plan.md).
+Weekly research and daily verified delivery are recorded in the [development journal](docs/development/journal.md).
+Research is concentrated on Mondays; confirmed phase work continues autonomously each day.
+Important tradeoffs use an options-based interview. There is no daily commit quota.
+The old status/roadmap/backlog/daily files remain historical references, not parallel live trackers.
