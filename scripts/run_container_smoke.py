@@ -91,6 +91,8 @@ class Smoke:
             cwd=ROOT,
             env=self.environment,
             text=True,
+            encoding="utf-8",
+            errors="replace",
             stdout=subprocess.PIPE,
             stderr=subprocess.STDOUT,
             timeout=timeout,
@@ -235,7 +237,15 @@ class Smoke:
         try:
             owned = True
             self.compose(
-                "up", "-d", "--wait", "--wait-timeout", "240", "api", "web", timeout=360
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "240",
+                "api",
+                "web",
+                "smoke-ingress",
+                timeout=360,
             )
             assert self.state("init")["ExitCode"] == 0
             assert self.state("worker") is None, "Worker must not start by default"
@@ -288,6 +298,24 @@ class Smoke:
                 )
             print("PASS: API attached only to an internal Docker network", flush=True)
 
+            self.compose("--profile", "worker", "up", "-d", "worker")
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                if (
+                    "Scheduler 已启动"
+                    in self.compose("logs", "--no-color", "worker").stdout
+                ):
+                    break
+                time.sleep(1)
+            else:
+                raise AssertionError("Opt-in worker did not initialize its scheduler")
+            assert self.state("worker")["Running"]
+            self.compose("stop", "worker")
+            print(
+                "PASS: opt-in worker initializes and stops; no scheduled job invoked",
+                flush=True,
+            )
+
             self.provider(768)
             self.compose("restart", "api")
             deadline = time.monotonic() + 90
@@ -303,7 +331,16 @@ class Smoke:
                 flush=True,
             )
             self.provider(1024)
-            self.compose("up", "-d", "--wait", "--wait-timeout", "120", "api", "web")
+            self.compose(
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "120",
+                "api",
+                "web",
+                "smoke-ingress",
+            )
             self.verify_http()
 
             self.compose("stop", "api", "web")
@@ -325,7 +362,16 @@ class Smoke:
                     f"{service} bypassed failed init"
                 )
             print("PASS: failed init blocks both API and opt-in worker", flush=True)
-            self.compose("up", "-d", "--wait", "--wait-timeout", "120", "api", "web")
+            self.compose(
+                "up",
+                "-d",
+                "--wait",
+                "--wait-timeout",
+                "120",
+                "api",
+                "web",
+                "smoke-ingress",
+            )
             self.verify_http()
             print("PASS: restored init allows application recovery", flush=True)
         except BaseException:

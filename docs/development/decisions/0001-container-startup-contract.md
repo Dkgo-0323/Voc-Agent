@@ -25,3 +25,7 @@
 ## 实施发现：MinIO 旧镜像已不可拉取
 
 首次完整 Linux CI 因旧 `minio/minio:RELEASE.2023-03-13T19-46-17Z` pull denied 失败，同标签 Quay manifest 也不存在。核对 [Milvus 官方开发 Compose](https://github.com/milvus-io/milvus/blob/06dec9a0e063aa9853da2000e555888fb491cb39/deployments/docker/dev/docker-compose.yml) 后，新 ops 编排改用其维护的 `milvusdb/minio:RELEASE.2024-12-18T13-15-44Z` 和 `mc ready local` 健康检查。这是新隔离环境的兼容性修复，不改变根 Compose、旧 MinIO、Milvus/Postgres 版本或任何旧卷。兼容性必须由实际 smoke 验证，不能仅凭上游使用记录认定通过。
+
+## 实施发现：internal 网络与宿主机测试入口
+
+第二次 Linux smoke 的应用内启动/健康检查成功，但直接映射 internal 网络端口的宿主机请求被拒绝。保留 API/worker/provider 仅连接内部网络，smoke 专用固定目标转发器同时接内部网络和回环入口网络，只转发 API/web 两个预定目标；不支持任意代理目的地、CONNECT 或生产流式服务。Compose smoke 覆盖通过 `ports: !reset []` 清除应用直映射，转发器是唯一回环发布入口；普通编排和前端 build-time URL 方案不增加网关。该测试辅助不替代未来生产代理/HTTPS 设计。

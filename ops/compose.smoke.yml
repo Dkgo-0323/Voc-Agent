@@ -13,6 +13,7 @@ services:
       timeout: 3s
       retries: 20
   api:
+    ports: !reset []
     environment: &smoke-provider
       EMBEDDING_API_KEY: smoke-placeholder-not-a-real-key
       EMBEDDING_BASE_URL: http://mock-embedding:8080/v1
@@ -20,6 +21,27 @@ services:
       mock-embedding: {condition: service_healthy}
   worker:
     environment: *smoke-provider
+  web:
+    ports: !reset []
+  smoke-ingress:
+    profiles: [smoke]
+    image: voc-agent-smoke-provider:local
+    command: [python, ingress.py]
+    networks: [default, ingress]
+    ports:
+      - "127.0.0.1:${VOC_API_PORT:-18000}:8081"
+      - "127.0.0.1:${VOC_WEB_PORT:-13000}:8082"
+    depends_on:
+      api: {condition: service_healthy}
+      web: {condition: service_healthy}
+    security_opt: [no-new-privileges:true]
+    cap_drop: [ALL]
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8081/health', timeout=3)"]
+      interval: 3s
+      timeout: 5s
+      retries: 20
 networks:
   default:
     internal: true
+  ingress:

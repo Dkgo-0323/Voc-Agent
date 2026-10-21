@@ -7,6 +7,7 @@ from urllib.request import Request, urlopen
 
 import pytest
 
+from ops.smoke.ingress import make_server
 from ops.smoke.provider import Handler, state
 from scripts.run_container_smoke import request
 
@@ -54,3 +55,41 @@ def test_wrong_dimension_is_explicitly_controllable(provider):
 def test_unexpected_http_status_has_readable_diagnostic(provider):
     with pytest.raises(AssertionError, match="GET .*expected 400, got 200"):
         request(provider + "/health", status=400)
+
+
+@pytest.fixture
+def ingress(provider):
+    from urllib.parse import urlsplit
+
+    upstream = urlsplit(provider)
+    server = make_server(0, (upstream.hostname, upstream.port), host="127.0.0.1")
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f"http://127.0.0.1:{server.server_port}"
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=3)
+
+
+def test_test_ingress_preserves_post_body_and_error_status(ingress):
+    assert request(ingress + "/health")["test_double"] is True
+    data = post(ingress + "/v1/embeddings", {"input": ["probe"]})
+    assert len(data["data"][0]["embedding"]) == 1024
+    assert (
+        request(ingress + "/missing", status=404)["error"] == "test endpoint not found"
+    )
+
+
+def test_test_ingress_refuses_arbitrary_proxy_destinations(ingress):
+    from http.client import HTTPConnection
+    from urllib.parse import urlsplit
+
+    address = urlsplit(ingress)
+    connection = HTTPConnection(address.hostname, address.port, timeout=3)
+    try:
+        connection.request("GET", "https://must-not-contact.invalid/")
+        assert connection.getresponse().status == 400
+    finally:
+        connection.close()

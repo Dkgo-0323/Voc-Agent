@@ -2,6 +2,7 @@ ARG PYTHON_IMAGE=python:3.12-slim-bookworm
 FROM ${PYTHON_IMAGE}
 WORKDIR /smoke
 COPY provider.py ./provider.py
+COPY ingress.py ./ingress.py
 ENV PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 USER 10001:10001
 EXPOSE 8080
