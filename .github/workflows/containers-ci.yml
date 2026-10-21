@@ -28,3 +28,14 @@ jobs:
         run: |
           docker run --rm --network none --entrypoint python voc-agent-backend:local -c "import os; assert os.getuid() != 0"
           docker run --rm --network none --entrypoint alembic voc-agent-backend:local -c /app/alembic.ini history
+  frontend-image:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Build standalone image with browser-reachable API URL
+        run: docker build -t voc-agent-frontend:local frontend
+      - name: Verify non-root runtime
+        run: docker run --rm --network none --entrypoint node voc-agent-frontend:local -e "if(process.getuid()===0)process.exit(1)"
