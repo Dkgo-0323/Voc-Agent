@@ -15,29 +15,12 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  backend-image:
+  startup-contracts:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - name: Build and verify installed runtime
-        run: docker build -f ops/Dockerfile.backend -t voc-agent-backend:local .
-      - name: Verify non-root installed migrations without services
-        run: |
-          docker run --rm --network none --entrypoint python voc-agent-backend:local -c "import os; assert os.getuid() != 0"
-          docker run --rm --network none --entrypoint alembic voc-agent-backend:local -c /app/alembic.ini history
-      - name: Validate isolated application Compose
-        run: docker compose --env-file ops/compose.empty.env -f ops/docker-compose.yml config --quiet
-  frontend-image:
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - name: Build standalone image with browser-reachable API URL
-        run: docker build -t voc-agent-frontend:local frontend
-      - name: Verify non-root runtime
-        run: docker run --rm --network none --entrypoint node voc-agent-frontend:local -e "if(process.getuid()===0)process.exit(1)"
+      - name: Build images and verify isolated startup and failure recovery
+        run: python3 scripts/run_container_smoke.py --build

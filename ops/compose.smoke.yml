@@ -1,0 +1,25 @@
+# TEST ONLY. Fixed vectors prove startup contracts, never retrieval quality.
+services:
+  mock-embedding:
+    profiles: [smoke]
+    image: voc-agent-smoke-provider:local
+    build:
+      context: smoke
+      args:
+        PYTHON_IMAGE: ${VOC_PYTHON_IMAGE:-python:3.12-slim-bookworm}
+    healthcheck:
+      test: [CMD, python, -c, "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8080/health', timeout=2)"]
+      interval: 2s
+      timeout: 3s
+      retries: 20
+  api:
+    environment: &smoke-provider
+      EMBEDDING_API_KEY: smoke-placeholder-not-a-real-key
+      EMBEDDING_BASE_URL: http://mock-embedding:8080/v1
+    depends_on:
+      mock-embedding: {condition: service_healthy}
+  worker:
+    environment: *smoke-provider
+networks:
+  default:
+    internal: true

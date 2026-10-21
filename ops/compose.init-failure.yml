@@ -1,0 +1,4 @@
+# TEST ONLY: deterministic init failure must block both API and worker.
+services:
+  init:
+    command: [python, -c, 'raise SystemExit(23)']
