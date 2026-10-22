@@ -244,22 +244,41 @@ checks and real-service validation.
 
 The Phase 14 Playwright suite uses a migrated disposable PostgreSQL database,
 a dedicated Milvus collection, real configured providers, and ports 8014/3014.
+It now requires an explicit live opt-in and a fresh run UUID. Review the
+[business acceptance tools and call inventory](docs/development/verification.md#业务验收工具10-22新增)
+before allowing provider calls. The API launcher uses an empty working directory;
+pass approved provider and authentication settings through the process environment rather than relying
+on the repository `.env`. It resolves `.venv/Scripts/python.exe` on Windows and
+`.venv/bin/python` on Linux; `PHASE14_PYTHON` may select an absolute interpreter path.
 After applying the migration and both demo scripts against those isolated
-names, run:
+names, and only after real-call approval, run:
 
 ```powershell
 Push-Location frontend
 $env:PHASE14_DATABASE_URL = "postgresql+asyncpg://phase14:phase14@localhost:55432/voc_phase14"
 $env:PHASE14_MILVUS_COLLECTION = "aspect_mentions_phase14_1024"
 $env:PHASE14_ADMIN_PASSWORD = "<same value as ADMIN_PASSWORD in .env>"
+$env:ADMIN_PASSWORD = $env:PHASE14_ADMIN_PASSWORD
+$env:PHASE14_RUN_ID = [guid]::NewGuid().ToString()
+$env:PHASE14_ALLOW_LIVE = "1"
 npm run test:e2e
 Pop-Location
 
 $env:DATABASE_URL = $env:PHASE14_DATABASE_URL
 $env:MILVUS_COLLECTION_NAME = $env:PHASE14_MILVUS_COLLECTION
 uv run python scripts/verify_phase14_demo_data.py
-uv run python scripts/verify_phase14_agent_traces.py
+uv run python scripts/verify_phase14_agent_traces.py `
+  --receipt "frontend/test-results/<this-test-output>/ask-receipt.json" `
+  --run-id $env:PHASE14_RUN_ID
+uv run python scripts/verify_phase14_report_receipt.py `
+  --receipt "frontend/test-results/<report-test-output>/report-receipt.json" `
+  --run-id $env:PHASE14_RUN_ID
 ```
+
+Use the exact `ask-receipt.json` attached by the Ask test. The read-only audit checks
+its session/message IDs; it no longer searches prior conversations for a matching
+prompt. This suite remains the synthetic Phase 14 regression. Public-review
+acceptance data and its expected weeks/evidence are a separate, pending preparation.
 
 The 50-case semantic Golden dataset has deterministic checks and an optional
 structured LLM judge. Evaluate captured observations reproducibly with:

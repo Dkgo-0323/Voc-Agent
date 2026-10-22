@@ -1,4 +1,6 @@
 import { expect, test, type Page } from "@playwright/test";
+import { writeFile } from "node:fs/promises";
+import { askReceipt, reportReceipt, type AskReceipt } from "./receipt";
 
 const password = process.env.PHASE14_ADMIN_PASSWORD;
 
@@ -15,10 +17,16 @@ async function login(page: Page) {
 
 async function ask(page: Page, prompt: string) {
   await page.locator("#ask-message").fill(prompt);
+  const responseReady = page.waitForResponse((response) =>
+    new URL(response.url()).pathname === "/api/ask" && response.request().method() === "POST");
   await page.getByRole("button", { name: "Send" }).click();
+  const response = await responseReady;
+  expect(response.ok()).toBe(true);
+  const receipt = askReceipt(await response.text());
   await expect(page.getByText(prompt)).toBeVisible();
   await expect(page.getByRole("button", { name: "Send" })).toBeVisible({ timeout: 120_000 });
   await expect(page.locator("article").last().getByRole("alert")).toHaveCount(0);
+  return receipt;
 }
 
 test.describe.serial("Phase 14 release verification", () => {
@@ -45,29 +53,55 @@ test.describe.serial("Phase 14 release verification", () => {
     await expect(page.getByText("No comparable pair is available")).toBeVisible();
   });
 
-  test("report generation and regeneration persist a weekly report", async ({ page }) => {
+  test("report generation and regeneration persist a weekly report", async ({ page }, testInfo) => {
     await login(page);
     await page.goto("/reports");
     await page.getByLabel("Report SKU").selectOption("ecoflow-delta2");
     await page.getByLabel("Report week").selectOption("202403");
-    await page.getByRole("button", { name: "Generate report" }).click();
+    const generate = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === "/api/reports/generate" && response.request().method() === "POST");
+    await page.getByRole("button", { name: /^(Generate|Regenerate) report$/ }).click();
+    const generatedResponse = await generate;
+    expect(generatedResponse.ok()).toBe(true);
+    const first = reportReceipt(await generatedResponse.text());
     await expect(page.getByText("Weekly report available")).toBeVisible({ timeout: 120_000 });
+    const regenerate = page.waitForResponse((response) =>
+      new URL(response.url()).pathname === "/api/reports/generate" && response.request().method() === "POST");
     await page.getByRole("button", { name: "Regenerate report" }).click();
+    const regeneratedResponse = await regenerate;
+    expect(regeneratedResponse.ok()).toBe(true);
+    const second = reportReceipt(await regeneratedResponse.text());
+    expect(first.sku_code).toBe("ecoflow-delta2");
+    expect(first.week_id).toBe(202403);
+    expect(second.report_id).toBe(first.report_id);
+    expect(second.sku_code).toBe(first.sku_code);
+    expect(second.week_id).toBe(first.week_id);
+    expect(Date.parse(second.generated_at)).toBeGreaterThan(Date.parse(first.generated_at));
     await expect(page.getByText("Weekly report available")).toBeVisible({ timeout: 120_000 });
+    const receiptPath = testInfo.outputPath("report-receipt.json");
+    await writeFile(receiptPath, JSON.stringify({ schema_version: 1,
+      run_id: process.env.PHASE14_RUN_ID, reports: [first, second] }, null, 2));
+    await testInfo.attach("report-receipt", { path: receiptPath, contentType: "application/json" });
   });
 
-  test("controlled Ask supports SQL, RAG, hybrid, follow-up, citations, and abstention", async ({ page }) => {
+  test("controlled Ask supports SQL, RAG, hybrid, follow-up, citations, and abstention", async ({ page }, testInfo) => {
+    const turns: AskReceipt[] = [];
     await login(page);
     await page.goto("/ask");
-    await ask(page, "Use tool_sql to count reviews and mentions for jackery-explorer-1000 in ISO week 202403.");
-    await ask(page, "What noise complaints do customers report about ecoflow-delta2 in ISO week 202403? Include an exact customer example.");
+    turns.push(await ask(page, "Use tool_sql to count reviews and mentions for jackery-explorer-1000 in ISO week 202403."));
+    turns.push(await ask(page, "What noise complaints do customers report about ecoflow-delta2 in ISO week 202403? Include an exact customer example."));
     await expect(page.getByRole("button", { name: "Open citation 1" }).last()).toBeVisible();
     await page.getByRole("button", { name: "Open citation 1" }).last().click();
     await expect(page.getByRole("dialog", { name: "Citation 1" })).toContainText("fan is extremely loud");
-    await ask(page, "Use tool_sql for the review count and tool_rag for an exact customer example about fan noise for ecoflow-delta2 in ISO week 202403.");
-    await ask(page, "What about jackery-explorer-1000 for the same week? Use tool_sql for its review count and tool_rag for one exact customer example.");
-    await ask(page, "Use tool_rag to check what evidence exists for ecoflow-delta2 in ISO week 202452.");
+    turns.push(await ask(page, "Use tool_sql for the review count and tool_rag for an exact customer example about fan noise for ecoflow-delta2 in ISO week 202403."));
+    turns.push(await ask(page, "What about jackery-explorer-1000 for the same week? Use tool_sql for its review count and tool_rag for one exact customer example."));
+    turns.push(await ask(page, "Use tool_rag to check what evidence exists for ecoflow-delta2 in ISO week 202452."));
     await expect(page.getByText("No matching VOC data was found for this request.")).toBeVisible();
+    expect(new Set(turns.map((turn) => turn.session_id)).size).toBe(1);
+    const receiptPath = testInfo.outputPath("ask-receipt.json");
+    await writeFile(receiptPath, JSON.stringify({ schema_version: 1,
+      run_id: process.env.PHASE14_RUN_ID, turns }, null, 2));
+    await testInfo.attach("ask-receipt", { path: receiptPath, contentType: "application/json" });
   });
 
   test("logout and expired authentication return to login", async ({ page }) => {

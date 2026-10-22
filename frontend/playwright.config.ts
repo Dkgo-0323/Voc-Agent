@@ -1,14 +1,7 @@
 import { defineConfig } from "@playwright/test";
-import path from "node:path";
+import { liveConfiguration } from "./e2e/runtime.mjs";
 
-const databaseUrl = process.env.PHASE14_DATABASE_URL;
-const milvusCollection = process.env.PHASE14_MILVUS_COLLECTION;
-
-if (!databaseUrl || !milvusCollection) {
-  throw new Error("Set PHASE14_DATABASE_URL and PHASE14_MILVUS_COLLECTION before running the release E2E suite.");
-}
-
-const repositoryRoot = path.resolve(__dirname, "..");
+const config = liveConfiguration(process.env);
 
 export default defineConfig({
   testDir: "./e2e",
@@ -22,9 +15,9 @@ export default defineConfig({
   },
   webServer: [
     {
-      command: ".\\.venv\\Scripts\\python.exe -m uvicorn backend.app.main:app --host 127.0.0.1 --port 8014",
-      cwd: repositoryRoot,
-      env: { ...process.env, DATABASE_URL: databaseUrl, MILVUS_COLLECTION_NAME: milvusCollection },
+      command: "node e2e/start-backend.mjs",
+      cwd: __dirname,
+      env: { ...process.env, DATABASE_URL: config.databaseUrl, MILVUS_COLLECTION_NAME: config.collection },
       url: "http://127.0.0.1:8014/health",
       timeout: 120_000,
       reuseExistingServer: false,

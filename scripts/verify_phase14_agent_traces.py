@@ -1,98 +1,103 @@
-"""Verify persisted Agent boundaries from the Phase 14 browser conversation."""
+"""Read-only audit of the exact Phase 14 conversation in a browser receipt.
+
+Requires an explicit receipt and run ID; never searches historical prompts.
+This audits the synthetic regression fixture, not a public-review dataset.
+"""
 
 from __future__ import annotations
 
+import argparse
 import asyncio
+import json
+import sys
+from pathlib import Path
 
-from sqlalchemy import select
+if __package__ in (None, ""):
+    sys.path.insert(0, str(Path(__file__).absolute().parents[1]))
 
-from backend.app.core.database import close_db, get_db_context, init_db
-from backend.app.db.models import ChatMessage, ChatSession
-from scripts.seed_phase14_demo_data import DEMO_MENTIONS, _id
+from shared.acceptance.receipts import TurnExpectation, audit_turns, validate_receipt
 
-FIRST_PROMPT = (
-    "Use tool_sql to count reviews and mentions for jackery-explorer-1000 "
-    "in ISO week 202403."
+PROMPTS = (
+    "Use tool_sql to count reviews and mentions for jackery-explorer-1000 in ISO week 202403.",
+    "What noise complaints do customers report about ecoflow-delta2 in ISO week 202403? Include an exact customer example.",
+    "Use tool_sql for the review count and tool_rag for an exact customer example about fan noise for ecoflow-delta2 in ISO week 202403.",
+    "What about jackery-explorer-1000 for the same week? Use tool_sql for its review count and tool_rag for one exact customer example.",
+    "Use tool_rag to check what evidence exists for ecoflow-delta2 in ISO week 202452.",
+)
+
+EXPECTATIONS = tuple(
+    TurnExpectation(
+        prompt,
+        frozenset(tools),
+        week_id=202403 if index == 3 else None,
+        status="abstained" if index == 4 else "success",
+        require_citation=index in {1, 2, 3},
+    )
+    for index, (prompt, tools) in enumerate(
+        zip(
+            PROMPTS,
+            (
+                {"tool_sql"},
+                {"tool_rag"},
+                {"tool_sql", "tool_rag"},
+                {"tool_sql", "tool_rag"},
+                {"tool_rag"},
+            ),
+            strict=True,
+        )
+    )
 )
 
 
-def _tool_names(message: ChatMessage) -> set[str]:
-    envelope = message.tool_calls or {}
-    return {call["tool_name"] for call in envelope.get("calls", [])}
+async def verify_agent_traces(receipt: dict, *, run_id: str) -> dict:
+    turns = validate_receipt(receipt, run_id=run_id)
+    # Delay importing application settings/drivers until CLI inputs are valid.
+    from uuid import UUID
 
+    from sqlalchemy import select
 
-async def verify_agent_traces() -> None:
+    from backend.app.core.database import close_db, get_db_context, init_db
+    from backend.app.db.models import ChatMessage
+    from scripts.seed_phase14_demo_data import DEMO_MENTIONS, _id
+
     await init_db()
     try:
         async with get_db_context() as session:
-            session_ids = (
-                await session.scalars(
-                    select(ChatSession.id).order_by(ChatSession.updated_at.desc())
-                )
-            ).all()
-            conversation: list[ChatMessage] | None = None
-            for session_id in session_ids:
-                messages = list(
-                    (
-                        await session.scalars(
-                            select(ChatMessage)
-                            .where(ChatMessage.session_id == session_id)
-                            .order_by(ChatMessage.created_at, ChatMessage.id)
-                        )
-                    ).all()
-                )
-                if any(
-                    message.role == "user" and message.content == FIRST_PROMPT
-                    for message in messages
-                ):
-                    conversation = messages
-                    break
+            messages = list(
+                (
+                    await session.scalars(
+                        select(ChatMessage)
+                        .where(ChatMessage.session_id == UUID(turns[0]["session_id"]))
+                        .order_by(ChatMessage.created_at, ChatMessage.id)
+                    )
+                ).all()
+            )
+            return audit_turns(
+                receipt,
+                messages,
+                EXPECTATIONS,
+                run_id=run_id,
+                allowed_mention_ids={
+                    str(_id("mention", i)) for i in range(len(DEMO_MENTIONS))
+                },
+            )
     finally:
         await close_db()
 
-    if conversation is None:
-        raise RuntimeError("No completed Phase 14 Agent conversation was found")
 
-    assistants = [message for message in conversation if message.role == "assistant"]
-    if len(assistants) != 5:
-        raise RuntimeError("The Phase 14 Agent conversation must contain five answers")
-    expected_tools = [
-        {"tool_sql"},
-        {"tool_rag"},
-        {"tool_sql", "tool_rag"},
-        {"tool_sql", "tool_rag"},
-        {"tool_rag"},
-    ]
-    actual_tools = [_tool_names(message) for message in assistants]
-    if any(not expected <= actual for expected, actual in zip(expected_tools, actual_tools, strict=True)):
-        raise RuntimeError(f"Unexpected Phase 14 Agent tool coverage: {actual_tools}")
-
-    follow_up_calls = (assistants[3].tool_calls or {}).get("calls", [])
-    if not any(
-        call.get("normalized_arguments", {}).get("week_range")
-        == {"start_week_id": 202403, "end_week_id": 202403}
-        for call in follow_up_calls
-    ):
-        raise RuntimeError("The follow-up did not recover the visible conversation week")
-    if (assistants[4].tool_results or {}).get("agent_status") != "abstained":
-        raise RuntimeError("The no-data turn did not persist an abstention")
-
-    expected_ids = {_id("mention", index) for index in range(len(DEMO_MENTIONS))}
-    cited_ids = {
-        cited_id
-        for message in assistants
-        for cited_id in (message.cited_ids or {}).get("mention_ids", [])
-    }
-    if not cited_ids or not cited_ids <= {str(value) for value in expected_ids}:
-        raise RuntimeError("Agent citations are not traceable to the Phase 14 fixture")
-
-    print("quantitative_tool_sql=True")
-    print("qualitative_tool_rag=True")
-    print("hybrid_sql_rag=True")
-    print("follow_up_week_from_recent_context=202403")
-    print(f"traceable_citation_ids={len(cited_ids)}")
-    print("no_data_status=abstained")
+def main() -> int:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--receipt", type=Path, required=True)
+    parser.add_argument("--run-id", required=True)
+    args = parser.parse_args()
+    receipt = json.loads(args.receipt.read_text(encoding="utf-8"))
+    print(
+        json.dumps(
+            asyncio.run(verify_agent_traces(receipt, run_id=args.run_id)), indent=2
+        )
+    )
+    return 0
 
 
 if __name__ == "__main__":
-    asyncio.run(verify_agent_traces())
+    raise SystemExit(main())
