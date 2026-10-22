@@ -80,4 +80,3 @@ export function reportReceipt(body: string): ReportReceipt {
   if (!receipt) throw new Error("Report stream ended without report_completed.");
   return receipt;
 }
-
