@@ -23,6 +23,18 @@
 - 文档整理：根README增加主导航；新增plan与本文件；旧三份状态表原位标记历史、不再同步；保留旧daily/模板/技术手册/ADR。兼容旧开发入口，不删除历史或用户材料。
 - 验证与配置更新结果：本条末尾追加。仅工作流/文档调整，不表示下一阶段真实调用或发布已确认。
 
+### 2026-10-22：基线复验与下一阶段interview（待答复）
+
+- 实际运行北京时间约11:54开始（最终结束时刻见automation memory），未倒填12:00。今天周四，不重复例行JD/开源研究；沿用迁移周研究，下一常规研究为10-26。
+- 读取自动化记忆、适用指引、README、plan/journal、ADR0001与相关实现。父目录/仓库根未发现AGENTS；frontend/AGENTS已读，本轮未改前端源码。可见聊天中除本次运行外未发现同仓库活跃开发；运行前已跟踪源码与暂存区干净，已有未跟踪材料全部保留。
+- 原基线本地/远端main均为 `27a9c6f5b1b95f5b458f3e90d3e3128f5bbf7604`。`git ls-remote`在沙箱因Windows MSYS命名对象权限失败，改用常规环境只读 `gh api repos/Dkgo-0323/Voc-Agent/commits/main --jq .sha` 核对；未改SSH或全局网络配置。查询该SHA的Actions： [Backend](https://github.com/Dkgo-0323/Voc-Agent/actions/runs/39619487797)、[Frontend](https://github.com/Dkgo-0323/Voc-Agent/actions/runs/39619487443)、[Container](https://github.com/Dkgo-0323/Voc-Agent/actions/runs/39619487770)均completed/success，是昨日已运行结果，今天只读确认。
+- 今日实际验证：Windows/Python3.12.7，常规进程环境执行 `.venv/Scripts/ruff.exe check --no-cache backend pipelines shared scripts tests conftest.py ops` 全通过；`.venv/Scripts/python.exe scripts/run_backend_tests.py` 为255 passed/1 skipped/3 warnings，16.26s，退出0。跳过为POSIX专用用例；警告来自PyMilvus/pkg_resources、environs/Marshmallow、Starlette TestClient。沿用隔离runner，无真实provider请求。Node22.15.0/npm10.9.2已读版本，本轮未重跑前端、wheel、容器或浏览器验收。
+- 审查所得：demo为10条人工构造mention，现有核验脚本要求9条达到质量门槛；seed会先写关系库再请求embedding，不能将中途失败算准备成功。旧trace校验按首问寻找历史会话，不能直接当本次精确会话审计；Playwright仍固定Windows解释器。现有SDK重试、Agent最多3次工具尝试与轮数限制不是总请求/费用硬上限。周报没有持久化mention关联，继续保留无引用卡片边界。以上为代码审查结论，未在真实服务复现。
+- 实际改动仅plan与本文件：澄清Phase13/14历史验收和新容器验收的区别，形成隔离数据、数量/检索、追问/拒答、失败、报告替换、跨平台浏览器的验收矩阵、入口、依赖及约2–3日估算。未修改业务代码或新增daily/ADR，不把提案当已确认阶段。
+- 已按用户工作流在本次聊天集中提出三题，解释场景/选项/推荐与代价：阶段终点、合成或公开真实数据、先工具清单或有硬上限的真实调用。尚未收到明确选择；沉默不构成授权。待选择的工作暂停，独立的基线核对、离线验证和方案整理已完成。
+- 当前可演示能力沿用既有容器启动/失败恢复；今天新增可审阅验收方案，无新的业务演示验收。未执行真实模型/数据抓取/调度任务/浏览器/公网；未读取或修改凭据、未操作旧Docker容器和卷。下一步收到三项选择后更新确认状态，在相同阶段内连续实现，不每日重选。
+- 文档验证：本次两份Markdown的12个本地链接、行尾/末尾换行检查通过，`git diff --check`通过；暂存区原为空。交付仅限这两个具体路径，按验证后提交、普通推送main的规则执行；本文自身完整SHA与最终推送结果由git记录、automation memory及最终回复提供，避免提交SHA自引用，不预填尚未执行的结果。
+
 ## 后续追加约定
 
 每周一在相应周标题下写一份简明周报：直接证据与可信边界、对仓库缺口的判断、是否调整优先级、周目标/候选交付/依赖/验收。其余日子不重复例行研究，只按实现问题查必要资料。
