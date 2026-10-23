@@ -64,7 +64,7 @@
 - Windows既有Python3.12环境：`.venv/Scripts/python.exe scripts/run_backend_tests.py`常规进程308 passed/1 POSIX skipped/3既有warnings，17.20s、退出0；`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`通过；git diff --check通过。初次沙箱专项pytest无输出，主动中止退出1，不计通过；Ruff初次3项导入格式问题自动修复后通过。
 - 可演示能力：无凭据的离线业务适配器成功/故障回归。未跑前端、浏览器、Docker、真实provider/数据/成本；无前端和运行入口变化，README与技术运行手册不改。真实数据使用条件仍未解决，本轮未重复调研/读取评论正文。
 - 阶段剩余：启动探测、API依赖、抽取器重试/fallback与跨进程全局额度尚未接到此上下文；本次只证明业务适配器接线，不代表完整运行器、人民币上限或96次全流程约束。下一步继续完整运行器与隔离目标接线，核验数据条件；清单完备后集中确认真实调用。
-- 本次仅4个具体文件提交并普通推送；完整实现SHA/推送状态见后续交接条目（由提交后追加），不预填远端CI成功。
+- 实现提交 `3cb5077edcb625bcca758c8b7d8a0122e39b34a7` 已普通推送origin/main，gh只读核对远端SHA一致，仅4个具体路径。该条推送证据另以收尾文档提交保存，其自身SHA见Git/memory与最终回复；未查询本次新CI，不预填成功。
 
 ## 后续追加约定
 
