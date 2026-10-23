@@ -1,232 +1,214 @@
-# VOC Agent
+# VOC Agent｜客户之声分析系统
 
-VOC Agent is a local-first Voice of Customer analysis MVP for product, market,
-and customer-insight teams monitoring portable-power products. It turns
-Reddit and Amazon review text into weekly portfolio metrics, SKU drill-downs,
-same-capacity-tier comparisons, grounded evidence answers, and generated
-weekly reports.
+**从分散的用户评论中提取产品信号，形成可追溯的分析与回答。**
 
-This repository is an engineering/demo system, not a production deployment.
-Its central rule is that PostgreSQL remains the relational source of truth:
-the LLM may select controlled tools and synthesize prose, but it does not own
-business rules, calculations, filters, citations, or conversation state.
+VOC Agent 面向便携储能产品的产品、市场与用户洞察场景，将 Reddit / Amazon 评论处理、
+方面级情感分析、周度看板、同容量档位竞品对比，以及 SQL / RAG 问答串联为完整应用。
+用户既能查看“某周哪些产品和问题值得关注”，也能继续追问并定位到支撑回答的评论证据。
 
-## Architecture and technology
+本项目是面向后端与 AI 应用开发岗位的工程实践，采用 **FastAPI + PostgreSQL + Milvus +
+Next.js + TypeScript**。核心设计是让模型负责工具选择和语言组织，让代码负责统计、
+业务规则、证据校验与持久化。目前交付范围为五个固定 SKU 的本地 MVP，公开真实评论业务验收仍在推进。
 
-```text
-Reddit / Amazon files
-        |
-        v
-ingest -> PII sanitize -> enrich -> quality score -> embed
-        |                                      |       |
-        +-------------- PostgreSQL <-----------+       +-> Milvus
-                           |                    source ID = aspect_mentions.id
-                           v
-                    FastAPI read models
-                           |
-              +------------+-------------+
-              |                          |
-        Next.js dashboard         handwritten Agent
-                                  report / SQL / RAG tools
-                                          |
-                                  SSE answers + citations
+[现有功能](#现有功能) · [运行截图](#运行截图) · [系统架构](#系统架构) ·
+[工程设计](#工程设计) · [部署与运行](#部署与运行) · [验证证据](#验证证据)
+
+## 现有功能
+
+| 模块 | 已实现能力 |
+| --- | --- |
+| 数据处理 | 支持 Reddit 接入和本地 Amazon 数据文件；PII 脱敏、方面与情感抽取、质量评分、向量化；按文档维护处理状态，单条失败不阻塞其他文档。 |
+| 周度概览 | 按周查看评论量、方面提及量、情感分布、正向信号、待关注问题与 SKU 列表。 |
+| SKU 详情 | 查看单个产品的周度指标、方面分布、趋势与符合质量门槛的证据。 |
+| 同档对比 | 对比同容量档位产品的指标、方面与证据；后端独立拒绝跨档对比。 |
+| 受控问答 | 手写 function-calling 循环，组合周报读取、固定 SQL 统计与 RAG 检索；支持最近可见对话的追问、SSE 回答与引用卡片。 |
+| 周报生成 | 汇总确定性统计与检索证据，校验候选报告后原子落库；生成或替换失败时保留旧报告。 |
+| 会话与认证 | 单密码登录、JWT 会话、聊天记录持久化；问答和周报生成需要认证。 |
+| 工程交付 | Python wheel、非 root 容器镜像、隔离 Compose、前后端 CI、容器故障恢复验证，以及精确到本次运行 ID 的验收工具。 |
+
+## 运行截图
+
+以下为 **2026-10-23 在 Chromium 中拍摄的真实 Next.js 页面**。
+截图使用基于组件测试的合成 API 数据，展示界面与交互布局，不代表真实评论结论或后端／模型联调结果。
+拍摄方式与复现命令见[截图说明](docs/images/README.md)。
+
+### 周度产品概览
+
+![周度概览：评论量、情感分布、方面信号和覆盖产品，使用合成演示数据](docs/images/overview-fixture.png)
+
+### 同容量档位产品对比
+
+![同档产品对比：产品选择、情感指标和方面对比，使用合成演示数据](docs/images/compare-fixture.png)
+
+此演示保留了无趋势、无证据时的空状态；未填入虚构的客户引文，也未调用模型生成对比总结。
+
+## 系统架构
+
+```mermaid
+flowchart TB
+    Sources["Reddit / Amazon 数据文件"] --> Ingest["采集与 PII 脱敏"]
+    Ingest --> Enrich["方面抽取 / 情感分析 / 质量评分"]
+    Enrich --> PG[("PostgreSQL：关系数据与业务事实")]
+    Enrich --> Embed["1024 维向量化"]
+    Embed --> Milvus[("Milvus：方面证据向量")]
+    Worker["独立 Worker / APScheduler"] --> Ingest
+    UI["Next.js 看板与问答界面"] --> API["FastAPI / JWT / SSE"]
+    API --> Analytics["确定性统计与同档对比"]
+    Analytics --> PG
+    API --> Agent["手写受控 Agent"]
+    Agent --> SQL["tool_sql：六种固定统计操作"]
+    Agent --> RAG["tool_rag：结构化过滤与检索"]
+    Agent --> Report["tool_report：读取已存周报"]
+    SQL --> PG
+    RAG --> Milvus
+    RAG --> Verify["关系库回查 / 质量过滤 / 引用校验"]
+    Verify --> PG
+    Report --> PG
+    API --> Generate["独立周报生成：汇总 / 校验 / 原子替换"]
+    Generate --> PG
+    Generate --> RAG
 ```
 
-- Backend and pipeline: Python 3.11+, FastAPI, SQLAlchemy asyncio/asyncpg,
-  Alembic, APScheduler, Pydantic, Presidio, PRAW, and the OpenAI-compatible SDK.
-- Storage: PostgreSQL 15; Milvus 2.3.4 with etcd and MinIO. The compatible
-  Python client is intentionally pinned below PyMilvus 2.4.
-- Frontend: Next.js 16, React 19, TypeScript, Tailwind CSS 4, TanStack Query,
-  Axios, Recharts, and Lucide.
-- Verification: pytest, Ruff, Vitest/Testing Library, ESLint, TypeScript,
-  Playwright, a deterministic Agent suite, and a semantic Golden evaluation.
+PostgreSQL 保存评论、方面提及、统计所需数据、会话与报告；Milvus 主键与
+`aspect_mentions.id` 保持一致。检索后回查关系库，回答引用只允许使用实际采用的有效证据。
+周报生成是独立工作流，Agent 的 `tool_report` 只读取已存报告。
 
-The ingestion pipeline accepts Reddit through PRAW and the local/static
-McAuley Amazon dataset. It sanitizes PII, restricts processing to five locked
-SKUs, and moves each document through `raw -> enriched -> embedded`; one failed
-document does not block its peers. Enrichment extracts evidence-backed aspect
-mentions, persists the exact `embed_text`, and applies a deterministic quality
-score. Dashboard and RAG reads share the default `0.55` quality threshold.
-Embeddings are 1024-dimensional, and each Milvus vector primary key must equal
-the corresponding `aspect_mentions.id` UUID. The independent worker runs the
-pipeline every Sunday at 02:00 UTC with one-instance/coalescing protection.
-
-See [docs/arch.md](docs/arch.md) for the detailed component, state, API, SSE,
-and provenance contracts.
-
-## Controlled Agent
-
-The Agent is a handwritten function-calling loop, not LangChain or
-LlamaIndex. A turn can attempt at most three tools over at most eight model
-rounds. If the first answer is unsupported and no tool was attempted, the
-Router allows one bounded grounding reprompt. These are its only tools:
-
-| Tool | Boundary |
+| 层次 | 技术 |
 | --- | --- |
-| `tool_report` | Reads an already persisted weekly report; never generates one. |
-| `tool_sql` | Runs only six fixed operations: review count, sentiment distribution, aspect distribution, trend, aspect trend, and same-tier SKU comparison. It cannot execute model-authored SQL. |
-| `tool_rag` | Accepts validated structured filters, embeds the query, searches Milvus, then hydrates and verifies evidence from PostgreSQL. |
+| 后端与任务 | Python 3.11+、FastAPI、SQLAlchemy asyncio、asyncpg、Alembic、APScheduler |
+| 数据与检索 | PostgreSQL 15、Milvus 2.3.4、etcd、MinIO、1024 维 embedding |
+| 模型与处理 | OpenAI 兼容 SDK、Pydantic、Presidio、PRAW |
+| 前端 | Next.js 16、React 19、TypeScript、Tailwind CSS 4、TanStack Query、Recharts |
+| 验证与交付 | pytest、Ruff、Vitest、ESLint、TypeScript、Playwright、Docker Compose、GitHub Actions |
 
-Capacity-tier comparison, dashboard eligibility, sample warnings, quality
-filtering, arithmetic, and canonical aspect validation are enforced in code.
-Only evidence actually used in the answer may become a citation. Citation IDs
-are PostgreSQL mention UUIDs that must match the Milvus IDs returned during
-retrieval. Chat history is stored in PostgreSQL; each turn receives only the
-most recent visible user/assistant messages (`RECENT_MESSAGE_LIMIT`, default
-8) plus compact tool metadata. There is no hidden active-filter or Agent state.
+## 工程设计
 
-`POST /api/ask` emits `tool_started`, `tool_completed`, `answer_delta`,
-`citation`, and terminal `done` SSE events, or a terminal `error`. Successful
-messages and citations are committed before final success events.
+| 设计 | 解决的问题 | 实现入口 |
+| --- | --- | --- |
+| 统计和规则由代码执行 | 模型不能执行自由生成的 SQL；质量阈值、容量档位、计算和参数校验有明确边界。 | [SQL 工具](backend/app/agent/tool_sql.py) |
+| 检索与引用分离校验 | 向量命中后回查 PostgreSQL，验证证据与来源，避免将相似文本直接当成可靠引用。 | [架构与来源契约](docs/arch.md) |
+| 有限 Agent 循环 | 每轮用户请求最多尝试三个工具、八轮模型调用；首次无工具且缺乏依据的回答有一次受限纠正机会。 | [Agent 详细说明](docs/technical-guide.md#controlled-agent) |
+| 成功事件晚于提交 | Ask 消息与引用提交后再发送最终成功事件；周报候选校验失败或取消时保留已有报告。 | [问答接口](backend/app/api/ask.py)、[周报接口](backend/app/api/reports.py) |
+| 验收绑定具体运行 | 以 run/session/message/report ID 审计本次结果，避免把旧会话或旧报告误判成本轮成功。 | [验收工具说明](docs/development/verification.md) |
 
-## Product routes and state
+## 部署与运行
 
-| Route | Purpose |
-| --- | --- |
-| `/login` | Single-password login and JWT session creation. |
-| `/overview` | Week selector, portfolio summary, and SKU monitoring table. |
-| `/skus/[sku_code]` | SKU metrics, trends, aspect breakdown, and evidence. |
-| `/compare` | Two-to-three SKU comparison; the server rejects mixed capacity tiers. |
-| `/reports` | Read a stored weekly report or explicitly generate/regenerate it. |
-| `/ask` | Quantitative, qualitative, hybrid, and recent-context follow-up questions with citation popovers. |
+以下命令从仓库根目录执行，开发示例采用 PowerShell。项目已交付本地部署与隔离容器启动方案，
+公网生产部署不在当前验收范围内。
 
-TanStack Query owns remote/server state, React Context owns the JWT session,
-and route components own ephemeral UI state. The token is stored under
-`voc.access-token` in browser local storage and attached to API requests. No
-Redux/Zustand store or client-side copy of Agent state is present. Dashboard
-read routes are public; Ask, report generation, and `/api/auth/me` require the
-JWT. Logout clears the token, and an invalid/expired token redirects to login.
+### 方式一：快速启动容器演示环境
 
-Weekly report generation is a separate authenticated workflow. It combines
-deterministic analytics with quality-filtered RAG evidence, asks the LLM for a
-bounded candidate, validates it, and atomically creates or replaces the week’s
-report. Failure or cancellation preserves the previous report. Its SSE stages
-are `report_started`, `stage_started`, `stage_completed`, `report_delta`, and
-`report_completed`, or terminal `error`. `report_delta` chunks a completed
-candidate; it is not token streaming. The schema has no report-to-mention join,
-so report citation cards are deliberately unavailable; Ask citations remain
-traceable.
-
-## Prerequisites
-
-For isolated container startup without real model credentials, see the
-[container delivery guide](ops/README.md). It builds non-root Python/Next.js
-images and tests startup/failure recovery with an explicitly fake embedding
-provider; this does not validate Ask/report quality or public deployment.
-
-- Python 3.11 or newer and [uv](https://docs.astral.sh/uv/)
-- Node.js 20 or newer with npm
-- Docker Desktop with Compose
-- An OpenAI-compatible chat provider and embedding provider; the configured
-  embedding model must return exactly 1024 dimensions
-- Reddit credentials only when running Reddit ingestion
-
-Copy `.env.example` to `.env` and replace placeholders. Never commit `.env`.
-The main variables are:
-
-| Variables | Meaning |
-| --- | --- |
-| `DATABASE_URL` | Async PostgreSQL URL used by the API, worker, migrations, and scripts. |
-| `POSTGRES_USER`, `POSTGRES_PASSWORD`, `POSTGRES_DB` | Docker Compose PostgreSQL initialization. |
-| `MILVUS_HOST`, `MILVUS_PORT`, `MILVUS_COLLECTION_NAME` | Vector service and collection. |
-| `MINIO_ACCESS_KEY`, `MINIO_SECRET_KEY` | Compose-only Milvus object-store credentials. |
-| `LLM_API_KEY`, `LLM_BASE_URL`, `LLM_MODEL` | Chat/enrichment provider. `OPENAI_API_KEY` is only a legacy fallback. |
-| `LLM_MAX_TOKENS`, `LLM_TIMEOUT_SECONDS`, `LLM_MAX_RETRIES`, `LLM_EXTRA_BODY` | Provider request controls. |
-| `EMBEDDING_API_KEY`, `EMBEDDING_BASE_URL`, `EMBEDDING_MODEL`, `EMBEDDING_DIMENSIONS`, `EMBEDDING_BATCH_SIZE` | Embedding provider and the cross-system dimension contract. |
-| `ASPECT_QUALITY_THRESHOLD`, `MIN_RELIABLE_SAMPLE`, `MAX_RAG_TOP_K`, `RECENT_MESSAGE_LIMIT` | Deterministic data and Agent limits. |
-| `JWT_SECRET_KEY`, `JWT_ALGORITHM`, `JWT_EXPIRE_DAYS`, `ADMIN_PASSWORD` | Authentication. Use non-default secrets outside development. |
-| `REDDIT_CLIENT_ID`, `REDDIT_CLIENT_SECRET`, `REDDIT_USER_AGENT` | Optional live Reddit ingestion. |
-| `APP_ENV`, `LOG_LEVEL` | Runtime mode and logging. |
-| `NEXT_PUBLIC_API_BASE_URL` | Frontend API origin; set it before a production build because it is build-time public configuration. |
-
-`API_PREFIX` remains in settings for compatibility, but current routes are
-mounted directly under `/api`; changing it does not remount the API.
-
-## How to run
-
-All PowerShell commands start at the repository root.
-
-1. Install dependencies and the browser used by release E2E:
-
-   ```powershell
-   uv sync --extra dev
-   Push-Location frontend
-   npm ci
-   npx playwright install chromium
-   Pop-Location
-   ```
-
-2. Start PostgreSQL and Milvus dependencies, migrate, and seed locked SKU
-   metadata:
-
-   ```powershell
-   docker compose up -d
-   uv run alembic -c alembic.ini upgrade head
-   uv run alembic -c alembic.ini current
-   uv run python -m backend.app.db.seed
-   ```
-
-   Create a migration only when the ORM schema intentionally changes:
-
-   ```powershell
-   uv run alembic -c alembic.ini revision --autogenerate -m "describe change"
-   uv run alembic -c alembic.ini upgrade head
-   ```
-
-3. Populate data using either the real pipeline or the deterministic demo
-   fixture. The pipeline uses configured sources/providers:
-
-   ```powershell
-   uv run python scripts/run_pipeline_once.py --limit 5
-   ```
-
-   For an idempotent development/demo fixture, use a dedicated collection.
-   This calls the configured embedding provider and is not a production seed:
-
-   ```powershell
-   $env:MILVUS_COLLECTION_NAME = "aspect_mentions_phase14_1024"
-   uv run python scripts/seed_phase14_demo_data.py
-   uv run python scripts/verify_phase14_demo_data.py
-   ```
-
-4. Start these long-running processes in separate repository-root terminals:
-
-   ```powershell
-   uv run uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
-   ```
-
-   ```powershell
-   uv run python -m backend.worker.main
-   ```
-
-   For frontend development:
-
-   ```powershell
-   Push-Location frontend
-   $env:NEXT_PUBLIC_API_BASE_URL = "http://127.0.0.1:8000"
-   npm run dev
-   ```
-
-   Or verify and run the production build locally:
-
-   ```powershell
-   Push-Location frontend
-   $env:NEXT_PUBLIC_API_BASE_URL = "http://127.0.0.1:8000"
-   npm run build
-   npm run start
-   ```
-
-Open `http://localhost:3000` and sign in with `ADMIN_PASSWORD`. API health is
-at `http://127.0.0.1:8000/health`; development OpenAPI is at `/docs`.
-
-## Tests, evaluation, and release gates
-
-Run deterministic backend and frontend checks:
+前置条件：Docker Engine / Docker Desktop 已启动，Compose 版本不低于 2.24.4。
+以下方案使用独立的 `voc-demo` 项目和固定测试向量服务，无需模型密钥。
 
 ```powershell
-uv run ruff check backend pipelines shared scripts tests conftest.py
-uv run python scripts/run_backend_tests.py
+docker compose --env-file ops/compose.empty.env -p voc-demo -f ops/docker-compose.yml -f ops/compose.smoke.yml --profile smoke up --build -d --wait
+```
 
+- 页面：<http://127.0.0.1:13000/overview>，本地演示密码：`local-container-only`。
+- API 健康检查：<http://127.0.0.1:18000/health>。
+- 初始数据库只有五个 SKU，没有评论和周度数据，页面会显示空状态；测试服务不提供聊天模型。
+  README 截图通过独立的浏览器 fixture 拍摄，不会由此空数据库自动生成。
+- 此方案仅绑定本机端口，固定演示密码不能用于公网环境。
+
+停止演示环境并保留数据卷：
+
+```powershell
+docker compose --env-file ops/compose.empty.env -p voc-demo -f ops/docker-compose.yml -f ops/compose.smoke.yml --profile smoke down
+```
+
+如需自动执行启动、维度错误拒绝、初始化失败阻断与恢复检查，可运行：
+
+```powershell
+python scripts/run_container_smoke.py --build
+```
+
+该脚本创建并清理自己专属的隔离项目。完整范围见[容器交付指南](ops/README.md)。
+
+### 方式二：源码开发与完整功能运行
+
+前置条件：Python 3.11+、uv、Node.js 20+、npm、Docker Compose；完整功能还需要
+兼容的聊天与 embedding 服务，embedding 输出必须为 **1024 维**。
+
+**1. 安装依赖并配置环境。**
+
+```powershell
+uv sync --locked --extra dev
+Push-Location frontend
+npm ci
+Pop-Location
+if (-not (Test-Path .env)) { Copy-Item .env.example .env }
+```
+
+已有 `.env` 时保留原配置。编辑 `.env`，至少检查以下变量；不要将密钥提交到 Git：
+
+| 配置 | 用途 |
+| --- | --- |
+| `DATABASE_URL`、`POSTGRES_USER`、`POSTGRES_PASSWORD`、`POSTGRES_DB` | API／迁移与 Compose 使用一致的数据库配置 |
+| `MILVUS_HOST`、`MILVUS_PORT`、`MILVUS_COLLECTION_NAME` | 向量数据库连接与集合 |
+| `LLM_API_KEY`、`LLM_BASE_URL`、`LLM_MODEL` | 聊天与抽取服务 |
+| `EMBEDDING_API_KEY`、`EMBEDDING_BASE_URL`、`EMBEDDING_MODEL`、`EMBEDDING_DIMENSIONS` | embedding 服务，维度固定为 1024 |
+| `ADMIN_PASSWORD`、`JWT_SECRET_KEY` | 登录密码与会话签名，替换示例值 |
+| `REDDIT_CLIENT_ID`、`REDDIT_CLIENT_SECRET`、`REDDIT_USER_AGENT` | 运行 Reddit 采集时配置 |
+
+完整配置和前端构建时环境变量说明见[技术指南](docs/technical-guide.md#prerequisites)。
+
+**2. 启动基础设施、迁移数据库并初始化产品元数据。**
+
+```powershell
+docker compose up -d
+uv run alembic -c alembic.ini upgrade head
+uv run python -m backend.app.db.seed
+```
+
+根目录 Compose 用于源码开发依赖，与方式一的隔离应用栈用途不同。
+如果 Milvus／MinIO 镜像拉取失败，先查阅[已记录的镜像兼容与下载限制](ops/README.md#images-and-configuration)。
+
+**3. 在不同终端启动 API、前端与可选 Worker。**
+
+```powershell
+# 终端一：API
+uv run uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+```
+
+```powershell
+# 终端二：前端
+Push-Location frontend
+$env:NEXT_PUBLIC_API_BASE_URL = "http://127.0.0.1:8000"
+npm run dev
+```
+
+```powershell
+# 可选终端三：周期采集任务
+uv run python -m backend.worker.main
+```
+
+打开 <http://localhost:3000>，使用 `ADMIN_PASSWORD` 登录。
+API 健康检查为 <http://127.0.0.1:8000/health>，开发接口文档为 <http://127.0.0.1:8000/docs>。
+Worker 默认每周日 UTC 02:00 调度处理；调度初始化与实际执行成功是不同的验证事项。
+
+**4. 准备数据。** SKU 初始化不会产生评论或向量。确认来源、提供商与隔离目标后，
+可按[技术指南](docs/technical-guide.md#how-to-run)运行真实处理链路或合成演示种子。
+相关操作会写入数据并可能调用付费模型；现有十条合成 mention 只用于回归，不代表真实市场样本。
+
+## 验证证据
+
+以下为指定历史提交的记录，**不是本次文档更新重新执行的业务测试**。
+详情见[验证证据索引](docs/validation-evidence.md)。
+
+| 层次 | 已记录结果 | 证据与适用范围 |
+| --- | --- | --- |
+| 后端 CI | Linux 307 测试通过；wheel 内容与六个安装导入检查通过 | [Backend CI](https://github.com/Dkgo-0323/Voc-Agent/actions/runs/39722565442)，提交 `8978982`，确定性验证。 |
+| 前端 CI | 54 测试通过，生产构建成功 | [Frontend CI](https://github.com/Dkgo-0323/Voc-Agent/actions/runs/39722565505)，同一提交，组件测试与构建。 |
+| 容器交付 | 启动、重复 seed、网络隔离、维度拒绝、初始化失败与恢复通过 | [Container CI](https://github.com/Dkgo-0323/Voc-Agent/actions/runs/39722565560)，使用测试向量，不验证语义效果。 |
+| 语义评测 | 50 条受控样例，回答平均评分 99%，确定性数值检查 100%，记录中的关键违规为零 | [逐样例结果](artifacts/eval/phase13_fixture_live_judge.json)，合成回答 + 真实 judge，不是 50 次真实 Agent 执行。 |
+| 历史浏览器 E2E | 最终四用例套件记录为通过 | [Phase 14 交接](docs/week4_phase14_handoff.md)，合成数据 + 真实服务／提供商；更新后的精确运行验收工具尚未完成真实复跑。 |
+
+本地常用离线检查：
+
+```powershell
+uv run ruff check backend pipelines shared scripts tests conftest.py ops
+uv run python scripts/run_backend_tests.py
 Push-Location frontend
 npm run lint
 npm run typecheck
@@ -235,122 +217,21 @@ npm run build
 Pop-Location
 ```
 
-The backend test entry point isolates local `.env` files and inherited application
-settings. The frontend type check generates Next.js route types before invoking
-TypeScript, so it also works from a clean checkout. See
-[delivery verification](docs/development/verification.md) for locked installation,
-installed-wheel smoke checks, CI commands, and the boundary between deterministic
-checks and real-service validation.
+公开真实评论导入、代表性数据效果、当前版本浏览器业务验收与公网部署仍有待完成。
+评测门槛、合成样例得分和页面截图分别表达不同证据，不等同于生产准确率。
 
-The Phase 14 Playwright suite uses a migrated disposable PostgreSQL database,
-a dedicated Milvus collection, real configured providers, and ports 8014/3014.
-It now requires an explicit live opt-in and a fresh run UUID. Review the
-[business acceptance tools and call inventory](docs/development/verification.md#业务验收工具10-22新增)
-before allowing provider calls. The API launcher uses an empty working directory;
-pass approved provider and authentication settings through the process environment rather than relying
-on the repository `.env`. It resolves `.venv/Scripts/python.exe` on Windows and
-`.venv/bin/python` on Linux; `PHASE14_PYTHON` may select an absolute interpreter path.
-After applying the migration and both demo scripts against those isolated
-names, and only after real-call approval, run:
+## 当前边界与取舍
 
-```powershell
-Push-Location frontend
-$env:PHASE14_DATABASE_URL = "postgresql+asyncpg://phase14:phase14@localhost:55432/voc_phase14"
-$env:PHASE14_MILVUS_COLLECTION = "aspect_mentions_phase14_1024"
-$env:PHASE14_ADMIN_PASSWORD = "<same value as ADMIN_PASSWORD in .env>"
-$env:ADMIN_PASSWORD = $env:PHASE14_ADMIN_PASSWORD
-$env:PHASE14_RUN_ID = [guid]::NewGuid().ToString()
-$env:PHASE14_ALLOW_LIVE = "1"
-npm run test:e2e
-Pop-Location
+- 固定五个 SKU，采用单密码／JWT；尚未交付多用户身份、RBAC 与租户隔离，浏览器 token 保存在 local storage。
+- Ask 引用可以追溯到 mention ID；周报尚无持久化的 report-to-mention 关联，因此不展示逐结论引用卡片。
+- 模型输出仍有不确定性；工具与轮数上限约束 Agent 执行，独立请求守卫尚未接入真实运行器，不构成费用硬上限。
+- embedding 维度与客户端版本有兼容约束，更换模型需要协调重建向量或迁移。
 
-$env:DATABASE_URL = $env:PHASE14_DATABASE_URL
-$env:MILVUS_COLLECTION_NAME = $env:PHASE14_MILVUS_COLLECTION
-uv run python scripts/verify_phase14_demo_data.py
-uv run python scripts/verify_phase14_agent_traces.py `
-  --receipt "frontend/test-results/<this-test-output>/ask-receipt.json" `
-  --run-id $env:PHASE14_RUN_ID
-uv run python scripts/verify_phase14_report_receipt.py `
-  --receipt "frontend/test-results/<report-test-output>/report-receipt.json" `
-  --run-id $env:PHASE14_RUN_ID
-```
+## 文档导航
 
-Use the exact `ask-receipt.json` attached by the Ask test. The read-only audit checks
-its session/message IDs; it no longer searches prior conversations for a matching
-prompt. This suite remains the synthetic Phase 14 regression. Public-review
-acceptance data and its expected weeks/evidence are a separate, pending preparation.
-
-The 50-case semantic Golden dataset has deterministic checks and an optional
-structured LLM judge. Evaluate captured observations reproducibly with:
-
-```powershell
-uv run python -m shared.eval.rag_eval `
-  --observations path\to\observations.json `
-  --judge-results path\to\judge-results.json `
-  --output artifacts\eval\evaluation-report.json
-```
-
-Or run the controlled fixture through the configured live judge (this incurs
-provider calls and is nondeterministic):
-
-```powershell
-uv run python -m shared.eval.fixture_live_run `
-  --output artifacts\eval\fixture-live-report.json
-```
-
-Release requires tool/routing >=90%, answer correctness >=85%, retrieval
-relevance >=85%, citation groundedness >=95%, abstention >=90%, follow-up
->=90%, and deterministic numeric correctness 100%. Cross-tier, provenance,
-and critical unsupported-claim violations must each be zero. Phase 13's saved
-fixture/live-judge report passed all gates; Phase 14 separately passed the
-real-service browser flow and Week 1-3 regressions. Details and exact results
-are in `docs/week4_phase13_handoff.md` and `docs/week4_phase14_handoff.md`.
-
-## Interview/demo flow
-
-1. **Login**: explain the deliberately small single-password/JWT boundary.
-2. **Overview**: select a week and read portfolio/SKU health from deterministic
-   API aggregates.
-3. **SKU**: open a product to inspect trends, aspects, and filtered evidence.
-4. **Compare**: compare same-tier SKUs, then mention that mixed tiers are
-   rejected by the server rather than by prompt instruction.
-5. **Weekly Report**: generate, inspect, and regenerate; explain validation and
-   atomic replacement.
-6. **Ask**: demonstrate a numeric SQL question, qualitative RAG question, and
-   combined SQL + RAG question.
-7. **Citation**: open a citation popover and trace its mention ID back through
-   PostgreSQL and Milvus provenance.
-8. **Follow-up**: ask a context-dependent question and explain recent-N visible
-   history with no hidden filter state.
-9. **Evaluation**: show deterministic contracts, the 50-case semantic gates,
-   and the separate browser release suite; distinguish fixtures from live E2E.
-
-## Known limitations
-
-- The five SKU catalog and single-password authentication are MVP constraints;
-  there is no multi-user identity, RBAC, tenant isolation, or deployment setup.
-- Providers and ingestion sources require external credentials/network access.
-  Real LLM and judge output can vary; one bounded grounding reprompt mitigates,
-  but does not eliminate, unsupported first responses.
-- The Phase 13 semantic run uses a controlled fixture plus a live judge, not 50
-  live Agent/database executions. Phase 14 covers a smaller browser flow using
-  PostgreSQL, Milvus, and real configured providers.
-- Weekly reports do not persist report-to-mention provenance and therefore do
-  not expose citation cards. Ask citations do.
-- Retrieval uses one fixed embedding dimension/collection contract; changing
-  models requires coordinated PostgreSQL/Milvus migration or re-embedding.
-- Analytics below `MIN_RELIABLE_SAMPLE` remain queryable with a warning rather
-  than being statistically conclusive.
-- The frontend token is held in local storage. This is adequate for the scoped
-  local demo, not a hardened browser-session design.
-- PyMilvus 2.3 and current test dependencies emit known deprecation warnings.
-  Their versions are constrained for compatibility with Milvus 2.3.4.
-
-
-## Development workflow
-
-Current phase, acceptance goals and priorities live in the [development plan](docs/development/plan.md).
-Weekly research and daily verified delivery are recorded in the [development journal](docs/development/journal.md).
-Research is concentrated on Mondays; confirmed phase work continues autonomously each day.
-Important tradeoffs use an options-based interview. There is no daily commit quota.
-The old status/roadmap/backlog/daily files remain historical references, not parallel live trackers.
+- [技术指南与演示流程（英文）](docs/technical-guide.md)
+- [验证证据与适用范围](docs/validation-evidence.md)
+- [截图来源与复现](docs/images/README.md)
+- [详细架构](docs/arch.md)与[数据契约](docs/data_contracts.md)
+- [容器交付](ops/README.md)与[验收命令](docs/development/verification.md)
+- [当前计划](docs/development/plan.md)与[交付记录](docs/development/journal.md)
