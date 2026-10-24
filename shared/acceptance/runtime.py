@@ -4,7 +4,7 @@ The caller owns this context for the entire run, rather than per HTTP request.
 Production API dependencies do not enable it automatically.
 """
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
@@ -12,7 +12,13 @@ import httpx
 from openai import AsyncOpenAI
 
 from backend.app.agent.llm import OpenAIChatCompletionsModel
+from backend.app.db.repositories.schemas import DocumentRead
 from pipelines.embedding.embedder import Embedder
+from pipelines.enrichment.aspect_extractor import (
+    AspectExtractor,
+    BatchExtractionResult,
+    ExtractionResponseError,
+)
 from shared.acceptance.transport import AcceptanceTransport, ProviderPolicy
 
 
@@ -21,6 +27,31 @@ class AcceptanceAdapters:
     chat: OpenAIChatCompletionsModel
     embedder: Embedder
     guard: AcceptanceTransport
+    extractor: AspectExtractor
+
+
+class _AcceptanceExtractor(AspectExtractor):
+    """Propagate semantic failures to the same run latch used by HTTP failures."""
+
+    def __init__(self, client: AsyncOpenAI, guard: AcceptanceTransport) -> None:
+        super().__init__(
+            client, model=guard.policy.chat_model,
+            max_tokens=guard.policy.max_output_tokens, fail_fast=True,
+        )
+        self._guard = guard
+
+    async def extract(self, documents: Sequence[DocumentRead]) -> BatchExtractionResult:
+        try:
+            result = await super().extract(documents)
+            if result.failed_document_errors:
+                raise ExtractionResponseError(
+                    "Acceptance extraction contains failed documents"
+                )
+            return result
+        except BaseException:
+            # Includes cancellation. A later business attempt must not reach wire.
+            self._guard.stop()
+            raise
 
 
 @asynccontextmanager
@@ -58,4 +89,5 @@ async def acceptance_adapters(
                 dimensions=1024, batch_size=64,
             ),
             guard=guard,
+            extractor=_AcceptanceExtractor(client, guard),
         )

@@ -254,6 +254,13 @@ def _truncate_at_sentence(text: str, limit: int) -> str:
 
 
 class AspectExtractor:
+    """Extract with production recovery by default, or one attempt for acceptance.
+
+    fail_fast disables both response/transport retries and per-document fallback.
+    Partial mention validation remains represented in BatchExtractionResult so
+    the acceptance owner can decide whether to stop the entire run.
+    """
+
     def __init__(
         self,
         client: AsyncChatClient,
@@ -262,6 +269,7 @@ class AspectExtractor:
         language_detector: Callable[[str], bool] = detect_english,
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         request_extra_body: dict[str, Any] | None = None,
+        fail_fast: bool = False,
     ) -> None:
         self._client = client
         self._model = model
@@ -269,6 +277,7 @@ class AspectExtractor:
         self._language_detector = language_detector
         self._sleep = sleep
         self._request_extra_body = dict(request_extra_body or {})
+        self._fail_fast = fail_fast
 
     async def extract(self, documents: Sequence[DocumentRead]) -> BatchExtractionResult:
         if len(documents) > MAX_BATCH_SIZE:
@@ -346,6 +355,10 @@ class AspectExtractor:
                 InternalServerError,
                 RateLimitError,
             ) as error:
+                if self._fail_fast:
+                    raise ExtractionResponseError(
+                        "Extraction failed; retries and single-document fallback disabled"
+                    ) from error
                 last_error = error
             if attempt < MAX_RETRIES:
                 await self._sleep(2**attempt)

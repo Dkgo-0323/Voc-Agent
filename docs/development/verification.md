@@ -102,7 +102,7 @@ python scripts/run_container_smoke.py --build
 ```powershell
 uv run --no-sync python scripts/plan_business_acceptance.py --documents 30 `
   --chat-model glm-4-flashx-250414 --embedding-model embedding-3
-uv run --no-sync python scripts/run_backend_tests.py tests/test_acceptance_tools.py tests/test_acceptance_transport.py tests/test_report_receipts.py
+uv run --no-sync python scripts/run_backend_tests.py tests/test_acceptance_tools.py tests/test_acceptance_transport.py tests/test_acceptance_runtime.py tests/test_report_receipts.py
 Push-Location frontend
 npm test -- --run tests/acceptance-runtime.test.ts
 Pop-Location
@@ -110,7 +110,11 @@ Pop-Location
 
 模型参数是拟定标识，不是读取本机配置所得。规划器默认模型为null、费用为null，始终输出`live_authorized=false`和`enforced_by_runtime=false`；没有执行模式。最多30篇，每篇最多3个mention，零SDK/抽取重试，两次seed、一次API启动、五轮Ask、两次周报，拟定请求上界为chat72/embedding24、合计96。它不包括真实judge、worker、抓取或额外启动，实际样本/服务不满足假设时重新规划。旧抽取器有2次重试和单篇回退，不能直接当作符合此清单。
 
-`shared/acceptance/transport.py`提供独立、尚未接入API/抽取器的`AcceptanceTransport`：同一明确HTTPS provider、两个明确模型，串行发送；发出前预占chat/embedding次数，输入字节数/输出token参数/64文本批量/1024维检查，错误、超时、缺usage、次数耗尽后阻断后续请求。用真实OpenAI SDK配合httpx假传输测试重试也不能增加出站请求。它只记次数和provider报告的token用量，不保存header、密钥、prompt或响应正文；**不实现人民币金额硬上限**。未来runner须让两个客户端共享实例、设SDK与抽取层零重试、接入总预算/token/停止控制；不同provider地址也需要相应共享计数设计，不能静默绕过。
+`shared/acceptance/transport.py`提供`AcceptanceTransport`：同一明确HTTPS provider、两个明确模型，串行发送；发出前预占chat/embedding次数，输入字节数/输出token参数/64文本批量/1024维检查，错误、超时、缺usage、次数耗尽后阻断后续请求。用真实OpenAI SDK配合httpx假传输测试重试也不能增加出站请求。它只记次数和provider报告的token用量，不保存header、密钥、prompt或响应正文；**不实现人民币金额硬上限**。
+
+10-23/24新增的`shared/acceptance/runtime.py::acceptance_adapters`要求显式策略、密钥与transport，无默认网络transport；同一上下文提供chat、embedder、extractor及guard，SDK零重试。验收extractor显式使用`AspectExtractor(fail_fast=True)`，关闭抽取重试及单篇fallback；错误JSON/文档ID、文档级校验失败和取消均锁定同一guard，后续聊天、向量化或调用者重试不能新增出站请求。正常空aspects可通过；噪音过滤仍在请求前执行。生产抽取器默认仍有恢复逻辑，不能直接当成验收适配器。HTTP成功只代表收到响应，业务协议是否有效由抽取器另行校验；`stop()`只保留停止标志，不保存错误正文。
+
+复现新增离线反例：`uv run --no-sync python scripts/run_backend_tests.py tests/test_acceptance_runtime.py tests/test_aspect_extractor.py`。真实SDK+MockTransport检查共享聊天额度、429、错误JSON、缺ID、虚构引文与取消，每个失败用例最多一次底层请求，后续embedding及抽取重试均不出站。这里没有数据库、真实评论或真实模型。模块导入仍涉及settings，须沿用空cwd与隔离环境的runner。生产API依赖/启动探测与跨进程完整运行器尚未接入；全流程96次上限未生效，未来runner还须接入总预算/token/停止控制；不同provider地址也需要相应共享计数设计，不能静默绕过。
 
 ### 浏览器回执和精确数据库核验
 

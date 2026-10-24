@@ -77,6 +77,10 @@ class AcceptanceTransport(httpx.AsyncBaseTransport):
             "monetary_cap_enforced": False,
         }
 
+    def stop(self) -> None:
+        """Latch a business validation failure without retaining sensitive details."""
+        self._stopped = True
+
     async def handle_async_request(self, request: httpx.Request) -> httpx.Response:
         async with self._lock:
             if self._stopped:
