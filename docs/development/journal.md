@@ -66,6 +66,16 @@
 - 阶段剩余：启动探测、API依赖、抽取器重试/fallback与跨进程全局额度尚未接到此上下文；本次只证明业务适配器接线，不代表完整运行器、人民币上限或96次全流程约束。下一步继续完整运行器与隔离目标接线，核验数据条件；清单完备后集中确认真实调用。
 - 实现提交 `3cb5077edcb625bcca758c8b7d8a0122e39b34a7` 已普通推送origin/main，gh只读核对远端SHA一致，仅4个具体路径。该条推送证据另以收尾文档提交保存，其自身SHA见Git/memory与最终回复；未查询本次新CI，不预填成功。
 
+### 2026-10-24：抽取链路零重试与业务失败停止接线
+
+- 延续已确认的ENG-05B/ENG-06阶段，周六不重复例行JD/开源研究。起点main `e988b5096d1b28be3aa0be4c4ca51f51245cfbdc`，只读gh核对远端一致；根/父目录无AGENTS，未改frontend，当前可见同仓库其他聊天无活跃开发。原有7组未跟踪材料保留。补核昨日该SHA的Backend39909239296、Frontend39909239305、Container39909239325全部completed/success，属于历史运行而非今天重新验收。
+- 场景：模型HTTP 200但返回缺失文档ID或虚构引文时，HTTP守卫无法自行识别业务失败；原抽取器还会重试/单篇fallback，不能直接用于零重试验收清单。新增AspectExtractor显式fail_fast选项，默认false保留生产恢复行为；验收工厂提供同一SDK/模型/token策略下的extractor，设为true关闭重试/fallback。验收包装器将协议异常、文档级失败、输入异常与取消传播到同一guard.stop()停止标志，之后其他适配器或调用者重试均不能新增出站请求；不把错误正文存入摘要。正常空aspects及请求前噪音过滤逻辑保留，未修改产品schema或证据校验规则。
+- Windows/Python3.12.7常规进程环境，隔离runner清理应用环境并使用空cwd：`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_runtime.py tests/test_aspect_extractor.py`最终23 passed/2既有warnings，8.61s；完整`.venv/Scripts/python.exe scripts/run_backend_tests.py`为314 passed/1 POSIX skipped/3既有warnings，18.41s。`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`及git diff/check、暂存diff/check通过。首轮新fixture漏填7个必填字段导致6 failed/17 passed，补齐None字段后重跑通过；首次Ruff修正1处导入排序。未弱化业务断言。
+- 六个新增用例用真实OpenAI SDK+MockTransport：成功抽取与聊天共享chat额度/明确模型和max_tokens；429、错误JSON、缺ID、虚构引文和取消各仅1次底层请求，之后embedding与再次抽取均被阻断。既有生产重试/单篇fallback回归通过。没有真实网络、评论、数据库或服务；这是离线业务适配器验收，不证明语义质量/真实效果，也未将人民币金额或96次全流程上限标记为已生效。
+- 实现及运行手册提交 `4f836c579c0ea5217677b582dbdc0954a840640b`（5个具体文件）已普通推送origin/main，无强推；plan与本条交接另作收尾提交，自身SHA由Git/memory/最终回复提供。README入口未变不改，无新daily/ADR，不同步历史三表；无用户材料、凭据或运行产物进入暂存区。
+- 当前可演示：无需凭据的抽取失败停止及共享额度离线反例。未重跑前端/浏览器/容器/wheel，未启动真实API/调用模型/导入评论/操作旧数据卷，未预填本次新CI成功。真实评论使用条件仍未解决，本轮未重复访问来源或读取正文；真实调用尚未授权，无需重新阶段访谈。
+- 阶段剩余：API启动维度探测、Ask/周报依赖及跨进程总运行器仍可能创建独立客户端，需要在下一增量统一运行上下文并离线验证无旁路；embedding/聊天响应的其他业务语义失败停止范围也尚未统一。之后核实有效模型、输入输出token/费用清单与数据条件，再集中确认真实运行。今天不将抽取器接线当作完整运行器完成。
+
 ## 后续追加约定
 
 每周一在相应周标题下写一份简明周报：直接证据与可信边界、对仓库缺口的判断、是否调整优先级、周目标/候选交付/依赖/验收。其余日子不重复例行研究，只按实现问题查必要资料。
