@@ -76,6 +76,17 @@
 - 当前可演示：无需凭据的抽取失败停止及共享额度离线反例。未重跑前端/浏览器/容器/wheel，未启动真实API/调用模型/导入评论/操作旧数据卷，未预填本次新CI成功。真实评论使用条件仍未解决，本轮未重复访问来源或读取正文；真实调用尚未授权，无需重新阶段访谈。
 - 阶段剩余：API启动维度探测、Ask/周报依赖及跨进程总运行器仍可能创建独立客户端，需要在下一增量统一运行上下文并离线验证无旁路；embedding/聊天响应的其他业务语义失败停止范围也尚未统一。之后核实有效模型、输入输出token/费用清单与数据条件，再集中确认真实运行。今天不将抽取器接线当作完整运行器完成。
 
+### 2026-10-25：API启动、Ask与周报共享验收上下文
+
+- 本轮实际在北京时间16时段执行（未倒填14:00）；延续已确认ENG-05B/ENG-06阶段，周日不重复例行调研，无新阶段/架构/调用决策。读取memory、根README、plan、当前周journal、ADR0001和真实代码；根及父目录无AGENTS，本次未改frontend。main起点`e1c110cd0137b57dc1078c743c3b1ecee01d63fa`，只读gh核对远端一致，可见同仓库其他聊天无活跃开发，原7组未跟踪材料保留。补核起点Backend40068911339、Frontend40068911346、Container40068911365均completed/success，属于昨日CI。
+- 目标/原因：即使抽取器共享守卫，原API启动探测、Ask和周报各自构造模型客户端仍可绕过验收总额度。新增`create_app(acceptance_adapters=...)`显式Python注入；启动维度探测和两类请求借用外层运行上下文的chat/embedder，共享计数、策略和停止标志。请求退出不关闭共享客户端，外层上下文负责资源。普通uvicorn入口不自动启用守卫；生产两类请求的客户端创建/关闭合并至`core/model_resources.py`，保留原配置/提供商选择。启动失败或取消锁定guard并释放DB，运行体异常也通过finally释放DB；注入时日志使用实际策略模型及1024维。
+- 验收：Windows Python3.12.7，常规进程下`.venv/Scripts/python.exe scripts/run_backend_tests.py`使用既有空cwd/清理应用环境runner，完整**319 passed / 1 POSIX skipped / 3既有warnings，48.31s，退出0**。`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`通过；git diff --check及暂存检查通过。新增5个回归用例，真实FastAPI lifespan/依赖解析、真实OpenAI SDK+MockTransport，数据库/SKU/Milvus初始化为替身。诊断路由只在测试中存在，不是产品新增API：启动embedding1次、Ask chat1次、周报embedding1次/chat1次，共4次底层请求；下一次Ask额度耗尽且底层请求数不变，禁止额外SDK构造。429/768维/取消均启动拒绝、DB关闭、后续聊天无法出站；运行体异常关闭DB。
+- 排障记录：最初专项命令误写不存在的`tests/test_reports_api.py`，未执行测试；移除错误路径。两次专项无输出被主动中断退出1，均不计通过；25秒faulthandler诊断在收集阶段的pymilvus→minio模块读取处超时，不是断言失败或已证明死锁。完整runner随后正常完成。初次Ruff修正导入排序，测试诊断路由改用Annotated依赖并将宽泛异常断言收紧为具体异常；429在守卫层转换为SDK APIConnectionError，修正对应预期，未弱化底层次数/停止断言。
+- 可演示成果：无凭据离线展示启动与跨HTTP请求共用额度，以及启动失败关闭后续出站。未启动真实API/数据库/Milvus、调用真实模型、读取/导入评论、复跑浏览器/前端/容器/wheel；不将5个接线测试称为真实Ask业务端点、报告生成/落库或语义质量验收。真实评论使用条件仍未解决，未重复读取正文或访问来源；无需用户重选阶段。
+- 实现及运行说明提交`efa9618d8ea0024b32d918071d6a0af070b405ff`，仅6个具体路径，已普通推送origin/main并通过gh只读核对远端SHA一致。plan仅更新接线状态与下一步；README运行/演示入口未变，不改；无新daily/ADR/旧状态表同步。原材料、密钥与运行产物不暂存。
+- 推送后只读CI快照：实现提交Backend40178730938、Frontend40178730879、Container40178730925均in_progress，不预填成功。收尾plan/journal文档提交自身SHA由Git/memory/最终回复交接。3份Markdown共17个本地链接/行尾检查通过。
+- 剩余/下一步：当前只统一单进程API上下文；现有Playwright启动器尚未使用此工厂，抽取/seed/API跨进程总运行器与96次全流程约束未完成，人民币硬上限未实现。聊天/向量化及报告的其他业务校验失败停止仍需补齐。继续受控启动器与整体额度/回执汇总接线，核实来源条件和模型/token/费用清单后再集中确认真实运行；真实调用、凭据、付费和正式发布均未授权。
+
 ## 后续追加约定
 
 每周一在相应周标题下写一份简明周报：直接证据与可信边界、对仓库缺口的判断、是否调整优先级、周目标/候选交付/依赖/验收。其余日子不重复例行研究，只按实现问题查必要资料。
