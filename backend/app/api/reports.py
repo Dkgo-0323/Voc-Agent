@@ -10,10 +10,8 @@ from typing import Annotated, Protocol, cast
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from openai import AsyncOpenAI
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from backend.app.agent.llm import OpenAIChatCompletionsModel
 from backend.app.agent.schemas import (
     ReportCompletedEvent,
     ReportDeltaEvent,
@@ -26,10 +24,9 @@ from backend.app.agent.schemas import (
 )
 from backend.app.agent.tool_rag import RagRetrievalService
 from backend.app.agent.tool_sql import AnalyticsRepositoryProtocol, AnalyticsService
-from backend.app.api.ask import _resolve_llm_api_key, _uses_zhipu_json_mode
 from backend.app.core.database import get_db
+from backend.app.core.model_resources import model_resources
 from backend.app.core.security import get_request_identity
-from backend.app.core.settings import settings
 from backend.app.db.repositories.analytics_repo import AnalyticsRepository
 from backend.app.db.repositories.evidence_repo import EvidenceRepository
 from backend.app.db.repositories.report_repo import ReportRepository
@@ -38,7 +35,6 @@ from backend.app.reporting.service import (
     ReportGenerationFailure,
     ReportGenerationService,
 )
-from pipelines.embedding.embedder import Embedder
 from pipelines.embedding.milvus_repo import MilvusRepository
 
 logger = logging.getLogger(__name__)
@@ -53,46 +49,19 @@ class RequestTransaction(Protocol):
 
 
 async def get_report_generation_service(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AsyncGenerator[ReportGenerationService, None]:
-    llm_key = _resolve_llm_api_key()
-    embedding_key = settings.embedding_api_key or settings.openai_api_key
-    if not llm_key:
-        raise RuntimeError("LLM_API_KEY is not configured")
-    llm_client = AsyncOpenAI(
-        api_key=llm_key,
-        base_url=settings.llm_base_url,
-        timeout=settings.llm_timeout_seconds,
-        max_retries=settings.llm_max_retries,
-    )
-    embedding_client = AsyncOpenAI(
-        api_key=embedding_key,
-        base_url=settings.embedding_base_url,
-        timeout=settings.llm_timeout_seconds,
-        max_retries=settings.llm_max_retries,
-    )
-    try:
+    async with model_resources(request.app) as resources:
         analytics = AnalyticsService(
             cast(AnalyticsRepositoryProtocol, AnalyticsRepository(db))
         )
         rag = RagRetrievalService(
             EvidenceRepository(db),
-            Embedder(client=embedding_client),
+            resources.embedder,
             MilvusRepository(),
         )
-        model = OpenAIChatCompletionsModel(
-            llm_client,
-            model=settings.llm_model,
-            max_tokens=settings.llm_max_tokens,
-            extra_body=settings.llm_extra_body,
-            final_response_format=(
-                {"type": "json_object"} if _uses_zhipu_json_mode() else None
-            ),
-        )
-        yield ReportGenerationService(ReportRepository(db), analytics, rag, model)
-    finally:
-        await llm_client.close()
-        await embedding_client.close()
+        yield ReportGenerationService(ReportRepository(db), analytics, rag, resources.chat)
 
 
 ReportGenerationDependency = Annotated[

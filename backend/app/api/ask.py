@@ -12,12 +12,10 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
-from openai import AsyncOpenAI
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.agent.conversation import ConversationService, UnknownSessionError
-from backend.app.agent.llm import OpenAIChatCompletionsModel
 from backend.app.agent.router import (
     VOC_SYSTEM_POLICY,
     FunctionCallingRouter,
@@ -36,13 +34,20 @@ from backend.app.agent.tool_rag import RagRetrievalService
 from backend.app.agent.tool_report import ReportService
 from backend.app.agent.tool_sql import AnalyticsService
 from backend.app.core.database import get_db
+from backend.app.core.model_resources import (
+    _resolve_llm_api_key as _resolve_llm_api_key,
+)
+from backend.app.core.model_resources import (
+    _uses_zhipu_json_mode as _uses_zhipu_json_mode,
+)
+from backend.app.core.model_resources import (
+    model_resources,
+)
 from backend.app.core.security import get_request_identity
-from backend.app.core.settings import settings
 from backend.app.db.repositories.analytics_repo import AnalyticsRepository
 from backend.app.db.repositories.conversation_repo import ConversationRepository
 from backend.app.db.repositories.evidence_repo import EvidenceRepository
 from backend.app.db.repositories.report_repo import ReportRepository
-from pipelines.embedding.embedder import Embedder
 from pipelines.embedding.milvus_repo import MilvusRepository
 
 logger = logging.getLogger(__name__)
@@ -66,69 +71,22 @@ class AskRequest(BaseModel):
         return normalized
 
 
-def _normalized_base_url(value: str) -> str:
-    return value.rstrip("/").lower()
-
-
-def _uses_zhipu_json_mode() -> bool:
-    return "bigmodel.cn" in _normalized_base_url(settings.llm_base_url)
-
-
-def _resolve_llm_api_key() -> str:
-    """Reuse the embedding key only when both clients target the same provider."""
-    if settings.llm_api_key:
-        return settings.llm_api_key
-    if _normalized_base_url(settings.llm_base_url) == _normalized_base_url(
-        settings.embedding_base_url
-    ):
-        return settings.embedding_api_key
-    if "api.openai.com" in settings.llm_base_url:
-        return settings.openai_api_key
-    return ""
-
-
 async def get_conversation_service(
+    request: Request,
     db: Annotated[AsyncSession, Depends(get_db)],
 ) -> AsyncGenerator[ConversationService, None]:
     """Build request-scoped services while keeping tool wiring out of the endpoint."""
 
-    llm_key = _resolve_llm_api_key()
-    embedding_key = settings.embedding_api_key or settings.openai_api_key
-    if not llm_key:
-        raise RuntimeError(
-            "LLM_API_KEY is not configured and no same-provider key can be reused"
-        )
-    llm_client = AsyncOpenAI(
-        api_key=llm_key,
-        base_url=settings.llm_base_url,
-        timeout=settings.llm_timeout_seconds,
-        max_retries=settings.llm_max_retries,
-    )
-    embedding_client = AsyncOpenAI(
-        api_key=embedding_key,
-        base_url=settings.embedding_base_url,
-        timeout=settings.llm_timeout_seconds,
-        max_retries=settings.llm_max_retries,
-    )
-    try:
+    async with model_resources(request.app) as resources:
         analytics_service = AnalyticsService(AnalyticsRepository(db))
         report_service = ReportService(ReportRepository(db))
         rag_service = RagRetrievalService(
             EvidenceRepository(db),
-            Embedder(client=embedding_client),
+            resources.embedder,
             MilvusRepository(),
         )
-        model = OpenAIChatCompletionsModel(
-            llm_client,
-            model=settings.llm_model,
-            max_tokens=settings.llm_max_tokens,
-            extra_body=settings.llm_extra_body,
-            final_response_format=(
-                {"type": "json_object"} if _uses_zhipu_json_mode() else None
-            ),
-        )
         agent_router = FunctionCallingRouter(
-            model,
+            resources.chat,
             build_tool_bindings(
                 report_service=report_service,
                 analytics_service=analytics_service,
@@ -137,9 +95,6 @@ async def get_conversation_service(
             system_policy=VOC_SYSTEM_POLICY,
         )
         yield ConversationService(ConversationRepository(db), agent_router)
-    finally:
-        await llm_client.close()
-        await embedding_client.close()
 
 
 ConversationDependency = Annotated[

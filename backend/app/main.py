@@ -15,7 +15,7 @@ import asyncio
 import logging
 import time
 from contextlib import asynccontextmanager
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
@@ -31,6 +31,9 @@ from backend.app.db.repositories.aspect_repo import AspectRepository
 from pipelines.config.targets import LOCKED_SKU_CODES
 from pipelines.embedding.embedder import Embedder
 from pipelines.embedding.milvus_repo import MilvusRepository
+
+if TYPE_CHECKING:
+    from shared.acceptance.runtime import AcceptanceAdapters
 
 # ── 日志配置 ──────────────────────────────────────────────────────────────────
 logging.basicConfig(
@@ -56,62 +59,31 @@ async def lifespan(app: FastAPI):
         async with get_db_context() as session:
             await AspectRepository(session).validate_locked_skus(set(LOCKED_SKU_CODES))
         await asyncio.to_thread(MilvusRepository().setup_collection)
-        await Embedder().validate_dimension_contract()
-    except Exception:
+        adapters = getattr(app.state, "acceptance_adapters", None)
+        embedder = adapters.embedder if adapters is not None else Embedder()
+        await embedder.validate_dimension_contract()
+    except BaseException:
+        adapters = getattr(app.state, "acceptance_adapters", None)
+        if adapters is not None:
+            adapters.guard.stop()
         await close_db()
         raise
     logger.info(
         "Embedding 维度契约验证通过 [model=%s, dimensions=%d]",
-        settings.embedding_model,
-        settings.embedding_dimensions,
+        adapters.guard.policy.embedding_model if adapters is not None else settings.embedding_model,
+        1024 if adapters is not None else settings.embedding_dimensions,
     )
     logger.info("✅ 所有基础设施初始化完成")
 
-    yield  # ← 应用正常运行期间挂起在这里
-
-    # ── Shutdown ──
-    logger.info("🔻 VOC Agent 正在关闭...")
-    await close_db()
-    logger.info("👋 关闭完成")
-
-
-# ── FastAPI 实例 ──────────────────────────────────────────────────────────────
-app = FastAPI(
-    title="VOC Agent API",
-    description="户外电源竞品舆情分析系统",
-    version="0.1.0",
-    docs_url="/docs" if settings.is_development else None,  # 生产关闭 Swagger
-    redoc_url="/redoc" if settings.is_development else None,
-    lifespan=lifespan,
-)
-
-# ── CORS（开发阶段放开，生产收紧） ────────────────────────────────────────────
-app.add_middleware(
-    CORSMiddleware,
-    # Browsers reject a credentialed CORS response whose allowed origin is
-    # ``*``. Keep development convenient while echoing only a local origin.
-    allow_origins=[] if settings.is_development else ["https://your-domain.com"],
-    allow_origin_regex=(
-        r"https?://(localhost|127\.0\.0\.1)(:\d+)?" if settings.is_development else None
-    ),
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-app.include_router(dashboard_router)
-app.include_router(auth_router)
-app.include_router(ask_router)
-app.include_router(reports_router)
+    try:
+        yield
+    finally:
+        logger.info("🔻 VOC Agent 正在关闭...")
+        await close_db()
+        logger.info("👋 关闭完成")
 
 
 # ── 路由 ──────────────────────────────────────────────────────────────────────
-@app.get(
-    "/health",
-    tags=["Infrastructure"],
-    summary="健康检查",
-    response_model=dict[str, Any],
-)
 async def health_check() -> dict[str, Any]:
     """
     检查所有基础设施连通性：
@@ -157,3 +129,44 @@ async def health_check() -> dict[str, Any]:
         raise HTTPException(status_code=503, detail=response)
 
     return response
+
+
+def create_app(*, acceptance_adapters: "AcceptanceAdapters | None" = None) -> FastAPI:
+    """Inject a caller-owned run explicitly; ordinary uvicorn remains production."""
+    app = FastAPI(
+        title="VOC Agent API",
+        description="户外电源竞品舆情分析系统",
+        version="0.1.0",
+        docs_url="/docs" if settings.is_development else None,  # 生产关闭 Swagger
+        redoc_url="/redoc" if settings.is_development else None,
+        lifespan=lifespan,
+    )
+
+    # ── CORS（开发阶段放开，生产收紧） ────────────────────────────────────────────
+    app.add_middleware(
+        CORSMiddleware,
+        # Browsers reject a credentialed CORS response whose allowed origin is
+        # ``*``. Keep development convenient while echoing only a local origin.
+        allow_origins=[] if settings.is_development else ["https://your-domain.com"],
+        allow_origin_regex=(
+            r"https?://(localhost|127\.0\.0\.1)(:\d+)?" if settings.is_development else None
+        ),
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+
+    app.include_router(dashboard_router)
+    app.include_router(auth_router)
+    app.include_router(ask_router)
+    app.include_router(reports_router)
+    if acceptance_adapters is not None:
+        app.state.acceptance_adapters = acceptance_adapters
+    app.add_api_route(
+        "/health", health_check, tags=["Infrastructure"],
+        summary="健康检查", response_model=dict[str, Any],
+    )
+    return app
+
+
+app = create_app()

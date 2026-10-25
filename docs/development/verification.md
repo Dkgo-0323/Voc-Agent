@@ -114,7 +114,17 @@ Pop-Location
 
 10-23/24新增的`shared/acceptance/runtime.py::acceptance_adapters`要求显式策略、密钥与transport，无默认网络transport；同一上下文提供chat、embedder、extractor及guard，SDK零重试。验收extractor显式使用`AspectExtractor(fail_fast=True)`，关闭抽取重试及单篇fallback；错误JSON/文档ID、文档级校验失败和取消均锁定同一guard，后续聊天、向量化或调用者重试不能新增出站请求。正常空aspects可通过；噪音过滤仍在请求前执行。生产抽取器默认仍有恢复逻辑，不能直接当成验收适配器。HTTP成功只代表收到响应，业务协议是否有效由抽取器另行校验；`stop()`只保留停止标志，不保存错误正文。
 
-复现新增离线反例：`uv run --no-sync python scripts/run_backend_tests.py tests/test_acceptance_runtime.py tests/test_aspect_extractor.py`。真实SDK+MockTransport检查共享聊天额度、429、错误JSON、缺ID、虚构引文与取消，每个失败用例最多一次底层请求，后续embedding及抽取重试均不出站。这里没有数据库、真实评论或真实模型。模块导入仍涉及settings，须沿用空cwd与隔离环境的runner。生产API依赖/启动探测与跨进程完整运行器尚未接入；全流程96次上限未生效，未来runner还须接入总预算/token/停止控制；不同provider地址也需要相应共享计数设计，不能静默绕过。
+复现新增离线反例：`uv run --no-sync python scripts/run_backend_tests.py tests/test_acceptance_runtime.py tests/test_aspect_extractor.py`。真实SDK+MockTransport检查共享聊天额度、429、错误JSON、缺ID、虚构引文与取消，每个失败用例最多一次底层请求，后续embedding及抽取重试均不出站。这里没有数据库、真实评论或真实模型。模块导入仍涉及settings，须沿用空cwd与隔离环境的runner。10-25已增加API工厂的显式上下文注入，见下节；跨进程完整运行器尚未接入，全流程96次上限仍未生效，未来runner还须接入总预算/token/停止控制；不同provider地址也需要相应共享计数设计，不能静默绕过。
+
+### API启动、Ask和周报共享上下文（10-25）
+
+`backend.app.main.create_app(acceptance_adapters=adapters)`是供后续受控运行器使用的Python接线入口。外层`async with acceptance_adapters(...)`必须覆盖应用启动、所有HTTP请求以及应用退出；API只借用chat/embedder，不在单个请求结束时关闭或重建它们。启动维度探测也使用同一个embedder并计入embedding额度。Ask与周报依赖统一通过`backend/app/core/model_resources.py`取得适配器；未注入时，普通`backend.app.main:app`继续使用按请求创建/关闭的生产客户端及现有配置。
+
+此入口不接受HTTP参数或环境开关来创建守卫，也不自动提供凭据或网络transport。调用者仍负责数据来源、隔离数据库/集合、批准的模型策略与运行许可。它解决单进程API内的共享额度；现有Playwright子进程启动器尚未自动使用该工厂，抽取/seed和API跨进程总额度也未统一。不能据此执行真实运行或宣称96次全流程约束完成。
+
+启动的数据库、SKU、Milvus或维度探测失败（包括取消）会锁定注入的guard并关闭DB，不进入接收请求阶段；正常运行体异常退出时也释放DB。启动日志在注入模式使用实际策略的embedding模型/1024维，避免打印生产默认模型造成误判。HTTP/usage/额度失败与既有抽取校验失败可停止后续出站；并非所有Agent/周报业务校验失败都已统一传播到guard。
+
+离线复现：`uv run --no-sync python scripts/run_backend_tests.py tests/test_acceptance_api_resources.py`。用真实FastAPI lifespan/依赖解析、真实SDK和MockTransport，存储初始化替身；诊断路由仅存在于测试中。验证一次启动embedding、Ask聊天、周报embedding与聊天共4次底层请求，下一次Ask额度耗尽而不出站；禁止额外SDK构造，确认请求结束不关闭共享客户端。另覆盖429、768维、取消导致启动拒绝/锁定，以及运行体异常时DB关闭。它不调用真实Ask业务端点或报告持久化，不证明模型语义、真实数据库、Milvus、浏览器或成本。
 
 ### 浏览器回执和精确数据库核验
 
