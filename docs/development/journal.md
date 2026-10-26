@@ -2,6 +2,35 @@
 
 按北京时间、ISO周组织周报与日更；当前目标/优先级只维护 [plan](plan.md)，运行入口见 [根README](../../README.md)。保留已确认决定和真实交付，不复制三份状态表。
 
+## 2026-W44（10-26 至 11-01）
+
+### 周一研究与本周方案（2026-10-26）
+
+访问日期均为2026-10-26。此次重新检索官网；下列证据不是三条实时完整JD验收。搜索索引有正文但详情页动态渲染返回零行时，只记录官网索引证据，不将搜索抓取时间当岗位发布日期、不确认实时名额。同企业样本有偏差，不外推整个校招市场。
+
+| 官方来源与类别 | 实际取得内容、日期与限制 | 与仓库缺口的关系 |
+| --- | --- | --- |
+| [小红书22021：2027校招AI应用研发工程师-社区工程](https://job.xiaohongshu.com/campus/position/22021) | 官方域名搜索索引含职责与资格：对话/上下文、Tool/RAG、交互、评测与Badcase；直接打开无正文；发布日期未知，非完整实时详情核验 | 已有Agent与SSE，但当前真实Ask/引用/报告链路尚未复跑；采纳效果与失败闭环优先 |
+| [小红书22019：2027校招Product Engineer-社区内容](https://job.xiaohongshu.com/campus/position/22019) | 官网索引含2027届本科以上、前端/客户端/服务端任一经验、全栈加分、计算机基础与排障；直开零行，发布日期未知 | Python+Next已有；把故障定位、交付与实际效果讲清楚，比新增技术栈更直接 |
+| [小红书2027职位索引：AI全栈企业智能](https://job.xiaohongshu.com/campus/position?positionName=27) | 官方列表索引有Agent落地与稳定性职责，缺独立详情资格，发布日期未知；第三条仅线索 | 不据此新增高并发/多租户范围，保持当前规模 |
+| [百度J100679详情](https://talent.baidu.com/jobs/detail/GRADUATE/66a12645-f0f1-435c-8426-9fb91f1be330)、[360校园职位详情](https://360campus.zhiye.com/campus/detail?jobAdId=ee3845e9-d55c-4aec-8302-99854c955e70) | 百度仅官网索引可定位旧岗位，详情超时；360索引有AI Coding流程线索，直开零行，届别/发布日期本轮未核实；不计新增完整样本 | 未取得足够跨企业新证据，不根据标题或第三方转载更改方向 |
+
+开源核验一个项目：[Langfuse Python SDK固定提交](https://github.com/langfuse/langfuse-python/blob/ab861f1f7094acfcdda8d61368a0d66a32cb7062/langfuse/experiment.py)，SHA `ab861f1f7094acfcdda8d61368a0d66a32cb7062`（本轮gh读取main并通过contents API解码该固定文件；提交发布日期未核实，不称最新发布版）。具体参考`ExperimentResult`、`RunnerContext`、`_run_evaluator`：结果/运行元数据独立组织，评测错误是否抛出有明确选项，默认并发50。本项目可借鉴运行回执和错误显式化；其默认并发及捕获错误返回空评分的语义不适合本阶段串行、失败停止的调用边界，不引入SDK、云账号或新增遥测服务。参考[官方数据集说明](https://langfuse.com/docs/evaluation/experiments/datasets)将输入/期望与实验结果分开；这支持后续构建可复核样例，但不能替代当前真实链路验证。
+
+**结论：继续原阶段ENG-05B/ENG-06，不启动新阶段。** 新证据强化端到端效果、评测和排障的重要性，没有改变优先级的充分理由。当前缺口是共享上下文尚未覆盖总运行器、数据使用条件未解决、真实调用清单和预算未确认，继续补闭环；不重复容器/CI阶段，也不为岗位名新增框架。
+
+本周阶段目标与候选交付：先完成适配器业务失败停止（周一已验收），再接受控启动器、抽取/seed/API统一额度与回执；离线验收须证明启动probe计数不漏、跨请求不重置、失败无后续出站、结束可汇总本次run。数据条件、有效模型/token/费用清单齐备后集中确认真实运行；获得授权与可用隔离服务后，再验收五轮Ask引用、报告替换与跨平台浏览器。本周候选并非无条件工期承诺；真实调用/数据条件/服务环境为依赖。来源条件不明确时不先导入正文，继续不依赖数据的工具实现。
+
+### 2026-10-26：聊天与向量响应失败锁定共享运行
+
+- 目标/原因：HTTP200和完整usage只证明请求成功返回；空答案、坏工具参数、错误向量仍可能导致业务重试继续消耗。验收包装器把聊天/向量化解析异常及取消同步给共享guard；首个失败后，后续抽取/聊天/向量化出站都受同一停止标志约束。通用Embedder新增索引必须完整且唯一、值必须有限，阻止正文与向量错配及NaN/Infinity污染，正常乱序仍排序还原。生产聊天仍沿用恢复逻辑；事实错误、工具schema、引用和报告落库失败不在今天断言范围。
+- 基线与保护：main起点`f7c0a7ac962150e12f794a9205dd853ebedcd00e`，gh核对远端一致；未发现根/父AGENTS，本次不改前端；可见同仓库其他聊天无活跃开发。原8组未跟踪材料（含output）保留，不读取/暂存其正文。补核昨日最终Backend40178791879、Frontend40178791896、Container40178791884均completed/success，属于昨天CI。
+- 实际验证：Windows Python3.12.7、常规进程中执行`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_runtime.py tests/test_embedder.py tests/test_acceptance_api_resources.py`，28 passed/2既有warnings，11.14s；完整`.venv/Scripts/python.exe scripts/run_backend_tests.py`为**328 passed/1 POSIX skipped/3既有warnings，17.31s，退出0**。全仓`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`通过。新增9个真实SDK+MockTransport回归：聊天空白/空choices/坏工具JSON/取消；向量维度/数量/重复索引/NaN/取消。65输入首批64失败只产生1次wire，第65条、跨适配器调用及调用者重试均无新增wire。既有正常回答、批量与乱序恢复回归保持通过。
+- 环境限制：沙箱首次专项无输出，主动中断退出1，不计通过；常规进程专项及完整runner通过。初次只读GitHub访问网络失败，常规只读查询成功；未更改网络/代理/凭据。未发真实模型请求、读取/导入评论、启动数据库/Milvus或复跑前端/容器/wheel/浏览器，不把离线用例当真实业务或语义准确率。
+- 可演示能力：无需凭据模拟provider返回HTTP200坏向量或空答案，观察只有首次底层请求、后续均被阻断。代码入口`shared/acceptance/runtime.py`、`pipelines/embedding/embedder.py`、`tests/test_acceptance_runtime.py`；运行说明更新verification，README入口不变不改，无新daily/ADR/历史表同步。
+- 剩余与下一步：优先统一受控启动器和抽取/seed/API完整运行上下文，补报告持久化/引用等下游业务失败停止及回执汇总；96次仍只是拟定全流程上界，无人民币硬上限。公开评论条件和真实调用授权未解决，无需重选已确认阶段。
+- 实现及verification提交`64f5ecd7be01a09402530515f61be28e91356c21`，4个具体路径，已普通推送origin/main（无强推）。Ruff、git diff/check与暂存检查通过，3 Markdown/17本地链接及行尾检查通过；收尾仅plan/journal，自身SHA由Git/memory/最终回复交接。未将用户材料、运行产物或密钥混入；新CI最终结果尚未核验，不预填成功。
+
 ## 2026-W43（10-19 至 10-25）
 
 ### 周度研究基线（流程迁移，不是新调研）
