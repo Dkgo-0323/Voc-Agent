@@ -2,6 +2,7 @@
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from math import isfinite
 from typing import Any, Protocol
 
 from openai import AsyncOpenAI
@@ -85,6 +86,8 @@ class Embedder:
             ordered = sorted(response.data, key=lambda item: item.index)
             if len(ordered) != len(batch):
                 raise RuntimeError("Embedding API returned an incomplete batch")
+            if [item.index for item in ordered] != list(range(len(batch))):
+                raise RuntimeError("Embedding API returned invalid batch indices")
             batch_vectors = [list(item.embedding) for item in ordered]
             invalid_dimensions = {
                 len(vector)
@@ -97,6 +100,8 @@ class Embedder:
                     f"EMBEDDING_DIMENSIONS={self._dimensions}, "
                     f"model={self._model}, returned={sorted(invalid_dimensions)}"
                 )
+            if any(not isfinite(value) for vector in batch_vectors for value in vector):
+                raise RuntimeError("Embedding API returned non-finite vector values")
             vectors.extend(batch_vectors)
         return vectors
 

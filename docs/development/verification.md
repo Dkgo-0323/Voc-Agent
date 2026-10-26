@@ -152,6 +152,12 @@ Playwright trace可能包含页面、网络、token与评论；只保留在忽�
 
 仅对本地已有产品metadata做了只读映射核对（未读取评论正文）：`B0BMQ9FGFS`标题为Explorer 1000/1002Wh；`B0BNL7R3L1`标题为DELTA 2/1024Wh加两块220W太阳能板套装。与当前两个mid档SKU核心容量匹配，但EcoFlow套装评论可能谈配件，后续需保留套装标记、人工核对归属，不能把太阳能板问题自动归为主机缺陷。该缓存文件的发布版本/完整性尚未独立核验；两条metadata原始行SHA256分别为`540b9e9aafcdade318100a731d4241a7d9eea29b46f5f2372c0ccc581ce5921b`与`2dffee597275acc4ec749894ab88868b5684577eecc560f9b81021f445b6d64d`，只作为本地读到的记录指纹，不当作发布者校验和。
 
+### 2026-10-26：HTTP成功后的业务解析失败停止
+
+`shared.acceptance.runtime.acceptance_adapters`的聊天和Embedder包装器现在将解析异常及取消传递给同一个`guard.stop()`；聊天空白且无工具调用、工具ID/名称缺失或参数不是JSON对象也拒绝。生产聊天适配器仍保留原来的解析/恢复行为。通用Embedder除数量/维度外，要求响应索引排序后恰为`0..batch_size-1`，且每个值有限，避免重复向量错配正文或NaN/Infinity流入向量库。正常乱序响应仍恢复输入顺序。
+
+离线复跑：`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_runtime.py tests/test_embedder.py tests/test_acceptance_api_resources.py`。Windows Python3.12.7常规进程下28通过/2既有warnings（11.14s）；完整runner328通过/1 POSIX跳过/3既有warnings（17.31s）。真实SDK+MockTransport模拟HTTP200损坏内容和取消，断言首批64条失败后不发送第65条，随后聊天/embedding或调用者重试无新wire。该层不证明答案事实正确、工具参数符合每个工具schema、引用有效或报告成功落库；下游业务失败和跨进程完整运行器仍待接线。未发真实请求或运行浏览器。
+
 ### 模型与费用依据（公开参考，不是实际账户配置）
 
 2026-10-22读取[智谱官方API价格表](https://docs.bigmodel.cn/cn/guide/start/pricing)：`glm-4-flashx-250414`非缓存输入/输出均0.1元/百万token，`embedding-3`标准输入0.5元/百万token。[Embedding-3说明](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3)支持1024维及最多64条文本批量。代码默认模型恰为这两个，但未读取本机.env核对有效配置，也未用真实请求验证可用性。

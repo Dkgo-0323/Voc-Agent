@@ -164,3 +164,77 @@ async def test_extraction_failure_stops_run_without_retry_or_fallback(failure):
         assert summary["stopped"] is True
         assert summary["outbound_attempts"] == {"chat": 1, "embedding": 0}
         assert documents[0].body not in json.dumps(summary)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["empty", "choices", "tool_json", "cancel"])
+async def test_chat_semantic_failure_stops_other_adapters(failure):
+    calls = []
+
+    def wire(request):
+        calls.append(request)
+        if failure == "cancel":
+            raise asyncio.CancelledError
+        response = json.loads(chat_response("  ").content)
+        if failure == "choices":
+            response["choices"] = []
+        elif failure == "tool_json":
+            response["choices"][0]["message"]["tool_calls"] = [{
+                "id": "tool-1", "type": "function", "function": {
+                    "name": "search", "arguments": "not-json",
+                },
+            }]
+        return httpx.Response(200, json=response)
+
+    async with acceptance_adapters(
+        POLICY, api_key="offline-only", transport=httpx.MockTransport(wire),
+    ) as adapters:
+        expected = (asyncio.CancelledError if failure == "cancel" else
+                    IndexError if failure == "choices" else ValueError)
+        with pytest.raises(expected):
+            await adapters.chat.complete(messages=[], tools=[])
+        with pytest.raises(APIConnectionError):
+            await adapters.embedder.embed(["text"])
+        with pytest.raises(APIConnectionError):
+            await adapters.chat.complete(messages=[], tools=[])
+        assert len(calls) == 1
+        assert adapters.guard.summary()["stopped"] is True
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["dimension", "missing", "indices", "nan", "cancel"])
+async def test_embedding_semantic_failure_stops_remaining_batches_and_chat(failure):
+    calls = []
+
+    def wire(request):
+        calls.append(request)
+        if failure == "cancel":
+            raise asyncio.CancelledError
+        count = len(json.loads(request.content)["input"])
+        data = [{"index": i, "object": "embedding",
+                 "embedding": [0.1] * (768 if failure == "dimension" else 1024)}
+                for i in range(count)]
+        if failure == "missing":
+            data.pop()
+        elif failure == "indices":
+            data[-1]["index"] = 0
+        elif failure == "nan":
+            data[0]["embedding"][0] = float("nan")
+        # The stdlib encoder allows NaN, simulating a nonconforming provider.
+        return httpx.Response(200, content=json.dumps({
+            "object": "list", "model": "embed-test", "data": data,
+            "usage": {"prompt_tokens": 2, "total_tokens": 2},
+        }).encode())
+
+    async with acceptance_adapters(
+        POLICY, api_key="offline-only", transport=httpx.MockTransport(wire),
+    ) as adapters:
+        expected = asyncio.CancelledError if failure == "cancel" else RuntimeError
+        with pytest.raises(expected):
+            await adapters.embedder.embed(["text"] * 65)
+        with pytest.raises(APIConnectionError):
+            await adapters.chat.complete(messages=[], tools=[])
+        with pytest.raises(APIConnectionError):
+            await adapters.embedder.embed(["text"])
+        assert len(calls) == 1  # No 65th text, cross-adapter call or caller retry.
+        assert adapters.guard.summary()["stopped"] is True

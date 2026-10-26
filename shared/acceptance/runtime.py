@@ -7,11 +7,12 @@ Production API dependencies do not enable it automatically.
 from collections.abc import AsyncIterator, Sequence
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
+from typing import Any
 
 import httpx
 from openai import AsyncOpenAI
 
-from backend.app.agent.llm import OpenAIChatCompletionsModel
+from backend.app.agent.llm import ModelResponse, OpenAIChatCompletionsModel
 from backend.app.db.repositories.schemas import DocumentRead
 from pipelines.embedding.embedder import Embedder
 from pipelines.enrichment.aspect_extractor import (
@@ -28,6 +29,44 @@ class AcceptanceAdapters:
     embedder: Embedder
     guard: AcceptanceTransport
     extractor: AspectExtractor
+
+
+class _AcceptanceChat(OpenAIChatCompletionsModel):
+    def __init__(self, client: AsyncOpenAI, guard: AcceptanceTransport) -> None:
+        super().__init__(client, model=guard.policy.chat_model,
+                         max_tokens=guard.policy.max_output_tokens)
+        self._guard = guard
+
+    async def complete(
+        self, *, messages: list[dict[str, Any]], tools: list[dict[str, Any]],
+    ) -> ModelResponse:
+        try:
+            result = await super().complete(messages=messages, tools=tools)
+            if not result.tool_calls and not (result.content or "").strip():
+                raise ValueError("Acceptance chat returned no answer or tool call")
+            if any(
+                not call.call_id or not call.name or not isinstance(call.arguments, dict)
+                for call in result.tool_calls
+            ):
+                raise ValueError("Acceptance chat returned an invalid tool call")
+            return result
+        except BaseException:
+            self._guard.stop()
+            raise
+
+
+class _AcceptanceEmbedder(Embedder):
+    def __init__(self, client: AsyncOpenAI, guard: AcceptanceTransport) -> None:
+        super().__init__(client=client, model=guard.policy.embedding_model,
+                         dimensions=1024, batch_size=64)
+        self._guard = guard
+
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        try:
+            return await super().embed(texts)
+        except BaseException:
+            self._guard.stop()
+            raise
 
 
 class _AcceptanceExtractor(AspectExtractor):
@@ -80,14 +119,8 @@ async def acceptance_adapters(
         max_retries=0, timeout=timeout_seconds,
     ) as client:
         yield AcceptanceAdapters(
-            chat=OpenAIChatCompletionsModel(
-                client, model=policy.chat_model,
-                max_tokens=policy.max_output_tokens,
-            ),
-            embedder=Embedder(
-                client=client, model=policy.embedding_model,
-                dimensions=1024, batch_size=64,
-            ),
+            chat=_AcceptanceChat(client, guard),
+            embedder=_AcceptanceEmbedder(client, guard),
             guard=guard,
             extractor=_AcceptanceExtractor(client, guard),
         )
