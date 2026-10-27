@@ -31,6 +31,16 @@
 - 剩余与下一步：优先统一受控启动器和抽取/seed/API完整运行上下文，补报告持久化/引用等下游业务失败停止及回执汇总；96次仍只是拟定全流程上界，无人民币硬上限。公开评论条件和真实调用授权未解决，无需重选已确认阶段。
 - 实现及verification提交`64f5ecd7be01a09402530515f61be28e91356c21`，4个具体路径，已普通推送origin/main（无强推）。Ruff、git diff/check与暂存检查通过，3 Markdown/17本地链接及行尾检查通过；收尾仅plan/journal，自身SHA由Git/memory/最终回复交接。未将用户材料、运行产物或密钥混入；新CI最终结果尚未核验，不预填成功。
 
+### 2026-10-27：SSE业务失败停止与后台任务清理
+
+- 目标/原因：模型HTTP200、usage和解析通过后，周报结构/引用边界校验、保存或提交仍可能失败。原API把错误转成SSE后没有通知运行guard，下一项验收仍可消费额度。今天在Ask与报告流边界连接共享停止；错误事件yield前已锁定，取消/初始断连/未到终态关闭生成器也锁定。Ask关闭时取消并等待后台turn和队列任务，未完成流关闭时尝试回滚；正常成功和Ask无数据拒答不误停。生产未注入适配器时停止函数为空操作，任务清理仍生效。
+- 基线与保护：main起点`667c85bffa0cb2b4bdd11038aaf552555aa0582d`，常规只读gh核对远端一致；根/父AGENTS不存在，本次不改frontend；可见同仓库其他聊天无活跃开发。原8组未跟踪材料保留，无正文读取或暂存。补核起点Backend40278720732、Frontend40278720720、Container40278720803全部completed/success，是昨日CI，不是今天复跑。今天周二无例行JD/开源研究，阶段继续ENG-05B/ENG-06，无新阶段访谈。
+- 实际改动：`core/model_resources.py::stop_acceptance_run`只操作显式注入的guard；`api/ask.py`处理ERROR结果/业务异常/提交异常与取消，并清理两类异步任务；`api/reports.py`处理候选校验/保存/提交失败及流关闭。终态先完成序列化再标记成功，读到done/report_completed立即aclose仍可继续下一项。报告若已commit但终态未送出便关闭，停止运行但rollback不能撤销已提交数据，需靠精确回执和数据库审计判断，不能当成未落库。
+- 验证环境/命令：Windows Python3.12.7，常规进程运行`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_ask_api.py tests/test_report_generation.py tests/test_acceptance_api_resources.py`，**50 passed/3既有warnings，8.89s**。最终完整`.venv/Scripts/python.exe scripts/run_backend_tests.py`为**341 passed/1 POSIX skipped/3既有warnings，20.16s，退出0**；`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`及git diff/check、暂存检查通过。新增13参数场景证明首次wire后业务失败，后续embedding无新wire；成功/拒答允许下一次聊天；取消/aclose后后台turn退出。报告走真实生成服务/Pydantic候选校验，真实SDK+MockTransport，统计/检索/存储/事务为替身；Ask服务为替身但实际调用共享SDK适配器。
+- 排障与未验证：沙箱专项无有效统计被中断退出1，不计通过；常规首轮49通过/1失败，发现新终态标志与asyncio.wait返回变量重名造成关闭流漏停，改为terminal_emitted后通过，完整回归包含终态后立即关闭反例。Ruff初轮自动修正2项导入顺序。未发真实模型请求、读取/导入评论、连接真实数据库/Milvus，未复跑浏览器、前端、容器或wheel；不将替身rollback称为真实事务/旧报告保留证明。
+- 交付与演示：实现和verification提交`aa545af888b4a7f1f6cadf3a38148d25fa8cade8`，仅6个具体路径，已普通推送origin/main；可无凭据演示模型返回后候选无效/提交失败只产生首次底层请求，下一embedding被挡。plan更新最新结果/边界；README运行与演示入口未变不改；无新daily/ADR/历史表同步。收尾文档提交自身SHA和最终远端/CI状态由Git/memory/本聊天交接，不预填通过。
+- 剩余与下一步：受控启动器与抽取/seed/API总运行器、回执汇总仍优先；引用审计失败、服务内恢复后返回成功、流创建前鉴权/schema拒绝尚未统一停止。96次为拟定上界，尚无全流程强制约束或人民币硬上限。数据使用条件/有效模型与token费用清单/真实运行授权仍是依赖，无需用户重新选择阶段。真实业务E2E与在线演示未完成。
+
 ## 2026-W43（10-19 至 10-25）
 
 ### 周度研究基线（流程迁移，不是新调研）
