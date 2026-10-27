@@ -5,8 +5,11 @@ from datetime import UTC, datetime
 from typing import Any
 from uuid import UUID, uuid4
 
+import httpx
 import pytest
+from fastapi import FastAPI, Request
 from fastapi.testclient import TestClient
+from openai import APIConnectionError
 
 from backend.app.agent.conversation import UnknownSessionError
 from backend.app.agent.schemas import (
@@ -37,6 +40,8 @@ from backend.app.core.database import get_db
 from backend.app.core.settings import settings
 from backend.app.db.repositories.schemas import ChatSessionRead
 from backend.app.main import app
+from shared.acceptance.runtime import acceptance_adapters
+from shared.acceptance.transport import ProviderPolicy
 
 SESSION_ID = UUID("10000000-0000-0000-0000-000000000001")
 USER_MESSAGE_ID = UUID("20000000-0000-0000-0000-000000000001")
@@ -618,3 +623,92 @@ async def test_stream_cancellation_propagates_to_in_flight_agent_work() -> None:
     with pytest.raises(asyncio.CancelledError):
         await pending
     await stream.aclose()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("outcome", ["error", "commit", "invalid", "cancel", "close", "success", "abstained"])
+async def test_acceptance_ask_stream_failure_stops_run_and_cleans_turn(outcome):
+    calls = []
+
+    def wire(request):
+        calls.append(request)
+        return httpx.Response(200, json={
+            "id": "ask", "object": "chat.completion", "created": 0,
+            "model": "chat-test", "choices": [{"index": 0,
+                "message": {"role": "assistant", "content": "answer"}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 2, "completion_tokens": 3, "total_tokens": 5},
+        })
+
+    async with acceptance_adapters(
+        ProviderPolicy("https://provider.invalid/v4", "chat-test", "embed-test"),
+        api_key="offline-only", transport=httpx.MockTransport(wire),
+    ) as adapters:
+        application = FastAPI()
+        application.state.acceptance_adapters = adapters
+
+        async def receive():
+            return {"type": "http.request"}
+
+        request = Request({"type": "http", "app": application}, receive)
+        status = {"error": AgentStatus.ERROR, "abstained": AgentStatus.ABSTAINED}.get(outcome, AgentStatus.SUCCESS)
+        result = agent_result([], status=status)
+        if outcome == "invalid":
+            result = ValueError("invalid business input")
+        started = asyncio.Event()
+        exited = asyncio.Event()
+
+        class Service(FakeConversationService):
+            async def run_turn(self, **kwargs):
+                try:
+                    await adapters.chat.complete(messages=[], tools=[])
+                    started.set()
+                    if outcome in {"close", "cancel"}:
+                        await kwargs["event_sink"](
+                            ToolStartedEvent(call_id="blocked", tool_name=ToolName.SQL)
+                        )
+                        await asyncio.Event().wait()
+                    return await super().run_turn(**kwargs)
+                finally:
+                    exited.set()
+
+        transaction = FakeTransaction()
+        if outcome == "commit":
+            transaction.commit_error = RuntimeError("synthetic commit failure")
+        stream = stream_ask_events(
+            payload=AskRequest(session_id=SESSION_ID, message="question"),
+            service=Service(result), created_by=None, request=request, transaction=transaction,
+        )
+        records = []
+        if outcome in {"close", "cancel"}:
+            records.append(await anext(stream))
+            assert started.is_set() and not exited.is_set()
+            if outcome == "close":
+                await stream.aclose()
+            else:
+                pending = asyncio.create_task(anext(stream))
+                await asyncio.sleep(0)
+                pending.cancel()
+                with pytest.raises(asyncio.CancelledError):
+                    await pending
+                await stream.aclose()
+        else:
+            async for record in stream:
+                records.append(record)
+                if record.startswith("event: error"):
+                    assert adapters.guard.summary()["stopped"]
+                if record.startswith("event: done"):
+                    break
+            await stream.aclose()
+        succeeded = outcome in {"success", "abstained"}
+        assert exited.is_set()  # No Agent task survives stream teardown.
+        assert any(r.startswith("event: done") for r in records) is succeeded
+        assert adapters.guard.summary()["stopped"] is (not succeeded)
+        assert transaction.rollbacks == (1 if outcome in {"commit", "invalid", "cancel", "close"} else 0)
+        assert len(calls) == 1
+        if not succeeded:
+            with pytest.raises(APIConnectionError):
+                await adapters.embedder.embed(["later question"])
+            assert len(calls) == 1
+        else:
+            await adapters.chat.complete(messages=[], tools=[])
+            assert len(calls) == 2

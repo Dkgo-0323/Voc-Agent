@@ -42,6 +42,7 @@ from backend.app.core.model_resources import (
 )
 from backend.app.core.model_resources import (
     model_resources,
+    stop_acceptance_run,
 )
 from backend.app.core.security import get_request_identity
 from backend.app.db.repositories.analytics_repo import AnalyticsRepository
@@ -142,6 +143,9 @@ async def stream_ask_events(
 ) -> AsyncIterator[str]:
     """Map persisted Agent results to the public SSE contract."""
 
+    terminal_emitted = False
+    turn_task = None
+    next_event = None
     try:
         if await request.is_disconnected():
             return
@@ -179,6 +183,8 @@ async def stream_ask_events(
 
         turn = await turn_task
         result = turn.agent_result
+        if result.status is AgentStatus.ERROR:
+            stop_acceptance_run(request)
         await transaction.commit()
 
         if result.status is AgentStatus.ERROR:
@@ -207,7 +213,7 @@ async def stream_ask_events(
             yield _sse(AnswerDeltaEvent(delta=delta))
         for citation in result.citations:
             yield _sse(CitationEvent(citation=citation))
-        yield _sse(
+        terminal = _sse(
             DoneEvent(
                 session_id=turn.session_id,
                 user_message_id=turn.user_message_id,
@@ -215,14 +221,28 @@ async def stream_ask_events(
                 status=result.status,
             )
         )
+        terminal_emitted = True
+        yield terminal
     except asyncio.CancelledError:
-        if "turn_task" in locals() and not turn_task.done():
+        stop_acceptance_run(request)
+        if turn_task is not None and not turn_task.done():
             turn_task.cancel()
             with suppress(asyncio.CancelledError):
                 await turn_task
         await _rollback_quietly(transaction)
         raise
+    except GeneratorExit:
+        if not terminal_emitted:
+            stop_acceptance_run(request)
+        if turn_task is not None and not turn_task.done():
+            turn_task.cancel()
+            with suppress(asyncio.CancelledError):
+                await turn_task
+        if not terminal_emitted:
+            await _rollback_quietly(transaction)
+        raise
     except UnknownSessionError:
+        stop_acceptance_run(request)
         await _rollback_quietly(transaction)
         yield _sse(
             ErrorEvent(
@@ -233,6 +253,7 @@ async def stream_ask_events(
             )
         )
     except ValueError:
+        stop_acceptance_run(request)
         await _rollback_quietly(transaction)
         yield _sse(
             ErrorEvent(
@@ -243,6 +264,7 @@ async def stream_ask_events(
             )
         )
     except Exception:
+        stop_acceptance_run(request)
         await _rollback_quietly(transaction)
         logger.exception("Agent request failed")
         yield _sse(
@@ -254,6 +276,16 @@ async def stream_ask_events(
                 )
             )
         )
+    finally:
+        if not terminal_emitted:
+            stop_acceptance_run(request)
+        # aclose()/GeneratorExit can arrive while a lifecycle event is yielded.
+        # Do not leave the turn or its queue waiter running after stream teardown.
+        for task in (turn_task, next_event):
+            if task is not None and not task.done():
+                task.cancel()
+                with suppress(asyncio.CancelledError):
+                    await task
 
 
 @router.post("/ask")

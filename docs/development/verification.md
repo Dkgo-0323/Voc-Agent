@@ -158,6 +158,16 @@ Playwright trace可能包含页面、网络、token与评论；只保留在忽�
 
 离线复跑：`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_runtime.py tests/test_embedder.py tests/test_acceptance_api_resources.py`。Windows Python3.12.7常规进程下28通过/2既有warnings（11.14s）；完整runner328通过/1 POSIX跳过/3既有warnings（17.31s）。真实SDK+MockTransport模拟HTTP200损坏内容和取消，断言首批64条失败后不发送第65条，随后聊天/embedding或调用者重试无新wire。该层不证明答案事实正确、工具参数符合每个工具schema、引用有效或报告成功落库；下游业务失败和跨进程完整运行器仍待接线。未发真实请求或运行浏览器。
 
+### 2026-10-27：SSE业务失败与提前关闭停止运行
+
+显式注入验收适配器时，Ask与报告SSE使用`core/model_resources.py::stop_acceptance_run`锁定同一guard。Ask的ERROR结果、业务异常、提交失败，以及报告候选校验、保存、提交失败，都会在错误事件yield之前停止后续模型出站；取消、初始断连和未到终态就关闭生成器也停止运行。Ask提前关闭时取消并等待后台turn和队列等待任务；未完成的生成器关闭会尝试回滚。普通生产应用没有注入适配器，停止函数为空操作，新增任务清理仍适用。
+
+只有完成提交并构造成功终态后，流才被标记完成；消费端读到`done`/`report_completed`后立即关闭流不会误停下一项验收。Ask的正常无数据拒答`abstained`仍是可接受终态，`partial`沿用原业务状态，不能据此声称事实/引用验收通过。报告若已经提交但终态尚未发出便断流，运行保守停止；后续rollback不能撤销已成功提交的数据，仍须用精确回执/数据库审计判定结果，不能假定失败等于没有写入。
+
+复现：`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_ask_api.py tests/test_report_generation.py tests/test_acceptance_api_resources.py`，Windows Python3.12.7常规进程下50通过/3既有warnings（8.89s）；新增13个参数场景。完整runner341通过/1 POSIX跳过/3既有warnings（20.16s）。报告使用真实生成服务/候选校验、真实SDK+MockTransport，统计/检索/存储/事务为替身；Ask服务为替身并实际调用同一SDK适配器。断言第一次wire后发生下游失败，后续embedding不产生新wire；成功和拒答允许下一次聊天，取消/关闭时后台turn已退出。首轮专项49通过/1失败揭示终态标志与asyncio.wait局部变量重名，修正后通过；沙箱专项无有效统计被中断，不计通过。
+
+这些是直接驱动SSE生成器的离线回归，不是本次真实HTTP服务器、浏览器断网、数据库事务、旧报告保留或模型语义验收。鉴权/请求schema在流创建前拒绝、服务内部已恢复而最终成功的错误、未来运行器的审计失败尚不在此次停止覆盖内。跨进程完整运行器/96次总约束、人民币硬上限和真实调用授权仍未完成。
+
 ### 模型与费用依据（公开参考，不是实际账户配置）
 
 2026-10-22读取[智谱官方API价格表](https://docs.bigmodel.cn/cn/guide/start/pricing)：`glm-4-flashx-250414`非缓存输入/输出均0.1元/百万token，`embedding-3`标准输入0.5元/百万token。[Embedding-3说明](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3)支持1024维及最多64条文本批量。代码默认模型恰为这两个，但未读取本机.env核对有效配置，也未用真实请求验证可用性。

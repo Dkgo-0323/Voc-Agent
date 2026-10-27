@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
 from openai import AsyncOpenAI
 
 from backend.app.agent.llm import OpenAIChatCompletionsModel
@@ -16,6 +16,14 @@ from pipelines.embedding.embedder import Embedder
 class ModelResources:
     chat: OpenAIChatCompletionsModel
     embedder: Embedder
+
+
+def stop_acceptance_run(request: Request) -> None:
+    """Latch an injected run on business/stream failure; production is a no-op."""
+    app = getattr(request, "app", None)
+    adapters = getattr(getattr(app, "state", None), "acceptance_adapters", None)
+    if adapters is not None:
+        adapters.guard.stop()
 
 
 def _normalized_base_url(value: str) -> str:

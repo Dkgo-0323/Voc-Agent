@@ -1,9 +1,13 @@
+import asyncio
 import json
 from datetime import UTC, datetime
 from types import SimpleNamespace
 from uuid import uuid4
 
+import httpx
 import pytest
+from fastapi import FastAPI, Request
+from openai import APIConnectionError
 
 from backend.app.agent.llm import ModelResponse
 from backend.app.agent.schemas import ReportToolArguments, ToolStatus
@@ -15,6 +19,8 @@ from backend.app.reporting.service import (
     ReportGenerationFailure,
     ReportGenerationService,
 )
+from shared.acceptance.runtime import acceptance_adapters
+from shared.acceptance.transport import ProviderPolicy
 
 
 def _sku() -> SkuMetadata:
@@ -335,3 +341,82 @@ async def test_report_without_evidence_relation_rejects_model_references(field, 
     assert repository.saved == []
     assert transaction.commits == 0
     assert transaction.rollbacks == 1
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", ["validation", "persist", "commit", "cancel", "close", None])
+async def test_acceptance_report_downstream_failure_stops_later_wire(failure):
+    calls = []
+
+    def wire(request):
+        calls.append(request)
+        content = '{"report_md":"bad","summary":"bad"}' if failure == "validation" else _candidate_json()
+        return httpx.Response(200, json={
+            "id": "report", "object": "chat.completion", "created": 0,
+            "model": "chat-test", "choices": [{"index": 0,
+                "message": {"role": "assistant", "content": content}, "finish_reason": "stop"}],
+            "usage": {"prompt_tokens": 2, "completion_tokens": 3, "total_tokens": 5},
+        })
+
+    async with acceptance_adapters(
+        ProviderPolicy("https://provider.invalid/v4", "chat-test", "embed-test"),
+        api_key="offline-only", transport=httpx.MockTransport(wire),
+    ) as adapters:
+        app = FastAPI()
+        app.state.acceptance_adapters = adapters
+
+        async def receive():
+            return {"type": "http.request"}
+
+        request = Request({"type": "http", "app": app}, receive)
+        transaction = FakeTransaction()
+        repository = FakeRepository()
+        service = _service(repository=repository, model=adapters.chat)
+
+        async def fail(*args, **kwargs):
+            if failure == "cancel":
+                raise asyncio.CancelledError()
+            raise RuntimeError("synthetic persistence failure")
+
+        if failure == "persist":
+            repository.save_weekly_report = fail
+        if failure in {"commit", "cancel"}:
+            transaction.commit = fail
+        stream = stream_report_events(
+            payload=GenerateReportArguments(sku_code="ecoflow-delta2", week_id=202635),
+            service=service, request=request, transaction=transaction,
+        )
+        records = []
+        if failure == "close":
+            async for record in stream:
+                records.append(record)
+                if record.startswith("event: report_delta"):
+                    break
+            await stream.aclose()
+        elif failure == "cancel":
+            with pytest.raises(asyncio.CancelledError):
+                async for record in stream:
+                    records.append(record)
+        else:
+            async for record in stream:
+                records.append(record)
+                if record.startswith("event: error"):
+                    # Latch must already be set while the error is being yielded.
+                    assert adapters.guard.summary()["stopped"]
+                if record.startswith("event: report_completed"):
+                    break
+            await stream.aclose()  # Closing after success must not stop the run.
+
+        assert len(calls) == 1
+        assert adapters.guard.summary()["stopped"] is (failure is not None)
+        assert any(r.startswith("event: report_completed") for r in records) is (failure is None)
+        assert transaction.rollbacks == (0 if failure is None else 1)
+        if failure in {"validation", "persist", "close"}:
+            assert repository.saved == []
+        if failure is not None:
+            with pytest.raises(APIConnectionError):
+                await adapters.embedder.embed(["later question"])
+            assert len(calls) == 1
+        else:
+            await adapters.chat.complete(messages=[], tools=[])
+            assert len(calls) == 2

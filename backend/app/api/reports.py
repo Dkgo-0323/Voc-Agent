@@ -25,7 +25,7 @@ from backend.app.agent.schemas import (
 from backend.app.agent.tool_rag import RagRetrievalService
 from backend.app.agent.tool_sql import AnalyticsRepositoryProtocol, AnalyticsService
 from backend.app.core.database import get_db
-from backend.app.core.model_resources import model_resources
+from backend.app.core.model_resources import model_resources, stop_acceptance_run
 from backend.app.core.security import get_request_identity
 from backend.app.db.repositories.analytics_repo import AnalyticsRepository
 from backend.app.db.repositories.evidence_repo import EvidenceRepository
@@ -95,6 +95,7 @@ async def stream_report_events(
 ) -> AsyncIterator[str]:
     """Emit only safe progress; candidates are not completed until commit succeeds."""
 
+    completed = False
     try:
         if await request.is_disconnected():
             return
@@ -121,14 +122,24 @@ async def stream_report_events(
         report = await service.persist(payload, candidate)
         await transaction.commit()
         yield _sse(ReportStageCompletedEvent(stage="persisting"))
-        yield _sse(ReportCompletedEvent(report=report))
+        terminal = _sse(ReportCompletedEvent(report=report))
+        completed = True
+        yield terminal
     except asyncio.CancelledError:
+        stop_acceptance_run(request)
         await _rollback_quietly(transaction)
         raise
+    except GeneratorExit:
+        if not completed:
+            stop_acceptance_run(request)
+            await _rollback_quietly(transaction)
+        raise
     except ReportGenerationFailure as exc:
+        stop_acceptance_run(request)
         await _rollback_quietly(transaction)
         yield _sse(ReportErrorEvent(error=exc.error))
     except Exception:
+        stop_acceptance_run(request)
         await _rollback_quietly(transaction)
         logger.exception("Report generation failed")
         yield _sse(
@@ -140,6 +151,9 @@ async def stream_report_events(
                 )
             )
         )
+    finally:
+        if not completed:
+            stop_acceptance_run(request)
 
 
 @router.post("/generate")
