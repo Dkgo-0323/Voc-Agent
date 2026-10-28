@@ -41,6 +41,16 @@
 - 交付与演示：实现和verification提交`aa545af888b4a7f1f6cadf3a38148d25fa8cade8`，仅6个具体路径，已普通推送origin/main；可无凭据演示模型返回后候选无效/提交失败只产生首次底层请求，下一embedding被挡。plan更新最新结果/边界；README运行与演示入口未变不改；无新daily/ADR/历史表同步。收尾文档提交自身SHA和最终远端/CI状态由Git/memory/本聊天交接，不预填通过。
 - 剩余与下一步：受控启动器与抽取/seed/API总运行器、回执汇总仍优先；引用审计失败、服务内恢复后返回成功、流创建前鉴权/schema拒绝尚未统一停止。96次为拟定上界，尚无全流程强制约束或人民币硬上限。数据使用条件/有效模型与token费用清单/真实运行授权仍是依赖，无需用户重新选择阶段。真实业务E2E与在线演示未完成。
 
+### 2026-10-28：单进程阶段编排、seed接线与运行回执
+
+- 目标/原因：独立脚本各建适配器会重置请求计数；只有模型/HTTP成功也不能证明精确回执和落库审计通过。新增`shared/acceptance/workflow.py`持有整轮上下文：prepare → seed → repeat_seed → API启动/启动probe → exercise → 回执校验/audit → API/SDK关闭。整轮仅在正常关闭后完成；阶段异常、取消、已停止却被回调吞错都阻止下一阶段。`RunRecord`保存run UUID、状态、固定阶段/耗时及次数/token汇总，不存回调输出或错误正文；不能复用record，额度高于拟定72/24在调用前拒绝。回执要求本次run、五轮Ask、同范围两次报告及递增时间，随后才允许真实审计回调执行。
+- 基线与保护：main起点`0d79185298987015b6c94559e95f9f70b975a4d6`，gh只读核实远端一致；根/父AGENTS未发现，本次未改frontend；可见同仓库其他聊天未活跃开发。原8组未跟踪材料保留，无正文读取/暂存。周三无例行JD研究，阶段与边界不变。补核昨天最终Backend40459857625、Frontend40459857434、Container40459857423均completed/success，属于昨日CI。
+- seed实际接线：`seed_demo_data(embedder=adapters.embedder)`可借用运行Embedder，不另建客户端；原独立默认不变。测试两次调用真实seed函数，关系会话/Milvus替身、真实SDK+假wire，20条document/mention merge每轮与相同向量UUID可复核，累计embedding2后共享chat仍可调用。此seed仍是10条合成fixture，不是公开数据准备，也未改变跨库非原子写入边界。
+- 实际验证：Windows Python3.12.7常规进程`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_workflow.py`首批13 passed/2既有warnings，9.48s；补入真实seed回归后执行完整`.venv/Scripts/python.exe scripts/run_backend_tests.py`，**355 passed/1 POSIX skipped/3既有warnings，18.39s，退出0**。新增共14场景：正常总计chat2/embedding3含probe；prepare、两次seed、启动维度、exercise、audit、跨run回执、关闭失败、取消、吞错、跨阶段额度耗尽，以及两次真实seed注入。全仓`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`通过，diff/暂存检查通过。首次沙箱专项无有效输出主动中止退出1，不计通过；常规执行取得上述有效结果。
+- 可演示与边界：无需凭据展示阶段推进、失败位置/耗时与累计请求，确认坏回执不进入审计、启动probe不漏计、失败不进入下一阶段。编排回调是可信集成代码，必须使用传入app/适配器，不能防止自行另建客户端；exercise不得二次启动lifespan。实际浏览器/HTTP监听、数据库/Milvus、真实模型/数据、费用仍未验证；本机未复跑前端/容器/wheel，未配置凭据或发布。之前阶段已写入的数据不会因停止自动撤销；真实审计仍需逐项核对。
+- 实现及运行说明提交`b7f92fd61fe17288cc2d1d618611df88de2b0555`，仅4个具体路径，已普通推送origin/main。plan/journal收尾提交自身SHA由Git/memory/本聊天交接，避免自引用；README运行入口未变不改，无新daily/ADR/历史状态表同步。
+- 剩余/下一步：继续监听服务器与Playwright回调对接，让浏览器使用同一已启动app，接实际数据库审计与样本准备；旧Playwright子进程启动器未纳入守卫，96次全流程约束及人民币硬上限尚未完成。数据使用条件、有效模型/token/费用清单和真实调用许可仍未解决，无需用户重选阶段。新CI结果收尾另行只读核查，不预填成功。
+
 ## 2026-W43（10-19 至 10-25）
 
 ### 周度研究基线（流程迁移，不是新调研）
