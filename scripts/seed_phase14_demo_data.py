@@ -133,7 +133,8 @@ def _id(kind: str, index: int) -> UUID:
     return uuid5(DEMO_NAMESPACE, f"{kind}:{index}")
 
 
-async def seed_demo_data() -> None:
+async def seed_demo_data(*, embedder: Embedder | None = None) -> None:
+    """An orchestrated run supplies its shared embedder; standalone is unchanged."""
     await init_db()
     try:
         async with get_db_context() as session:
@@ -188,7 +189,7 @@ async def seed_demo_data() -> None:
             for item in DEMO_MENTIONS
         ]
         texts = [build_embed_text(item) for item in inputs]
-        vectors = await Embedder().embed(texts)
+        vectors = await (embedder if embedder is not None else Embedder()).embed(texts)
         async with get_db_context() as session:
             for index, text in enumerate(texts):
                 await session.execute(

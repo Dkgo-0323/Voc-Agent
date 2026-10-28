@@ -168,6 +168,20 @@ Playwright trace可能包含页面、网络、token与评论；只保留在忽�
 
 这些是直接驱动SSE生成器的离线回归，不是本次真实HTTP服务器、浏览器断网、数据库事务、旧报告保留或模型语义验收。鉴权/请求schema在流创建前拒绝、服务内部已恢复而最终成功的错误、未来运行器的审计失败尚不在此次停止覆盖内。跨进程完整运行器/96次总约束、人民币硬上限和真实调用授权仍未完成。
 
+### 2026-10-28：单进程阶段编排与运行回执
+
+`shared/acceptance/workflow.py::run_business_acceptance`是显式Python编排入口，没有CLI、默认网络transport或凭据读取。它持有一个`acceptance_adapters`上下文，按prepare → seed → repeat_seed → API启动 → exercise → audit → API关闭 → SDK关闭运行。调用方提供经过授权的数据准备、seed、浏览器/服务监听和数据库审计回调；这些是可信集成代码，必须使用传入的适配器/应用，不是安全沙箱。API由编排器创建并管理一次lifespan，exercise收到已经启动的app，不能再次启动lifespan或另启普通uvicorn进程。
+
+`scripts/seed_phase14_demo_data.py::seed_demo_data(embedder=adapters.embedder)`现可借用同一Embedder，独立运行的旧默认保持不变。该脚本仍只生成10条合成mention，不处理公开真实评论，也不负责证明数据库为空/归本次拥有。已有关系库写入和Milvus写入非跨库原子事务；失败停止不会撤销之前已提交的数据。
+
+每个阶段开始和返回时都检查共享停止标志；回调吞掉provider异常也不能继续下一阶段。失败/取消会锁定guard并传播原异常，停止后续阶段。Ask回执必须绑定同一run ID且恰好五轮；报告回执必须是同一报告范围的两次生成且时间递增；随后才调用精确数据库审计。仅通过回执结构不等于通过数据库或语义验收，audit回调必须在不匹配时抛错。关闭API/SDK失败也不能把整轮标为completed。
+
+调用方预先创建`RunRecord(UUID)`，结束后可用`dataclasses.asdict(record)`序列化；即使异常/取消仍可读状态、阶段耗时、出站计数和provider报告token。只保存固定字段，不存回调输出、错误正文、密钥、prompt或评论；不自动写文件。record不得复用；chat/embedding额度不得超过既有拟定72/24，否则运行前拒绝，要求重新规划。此限制只覆盖经传入适配器的请求，尚未覆盖旧Playwright子进程启动器；费用仍为null、`monetary_cap_enforced=false`。
+
+离线复现：`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_workflow.py`。新增14场景：正常顺序与合计chat2/embedding3（含启动probe），prepare/seed/重复seed/启动/业务/审计/回执/关闭失败，取消、吞错、累计额度耗尽，以及真实seed函数两次注入（SQLAlchemy会话和Milvus替身、真实SDK+MockTransport）。完整Windows Python3.12.7隔离runner **355 passed/1 POSIX skipped/3既有warnings，18.39s**；全仓Ruff通过。首次沙箱专项无有效输出主动中止，不计通过；常规进程首批13场景9.48s通过，新增真实seed回归包含在完整结果内。
+
+未启动真实HTTP监听/数据库/Milvus/浏览器，未调用真实模型、读取评论或配置凭据；没有重跑前端/容器/wheel。当前交付为单进程编排内核，尚需接入监听服务器、Playwright回执、公开样本准备和真实审计回调，不能称96次全流程约束或真实E2E已验收。所有入口仍须沿用空cwd/隔离环境，避免settings自动发现根.env；真实运行另行集中确认。
+
 ### 模型与费用依据（公开参考，不是实际账户配置）
 
 2026-10-22读取[智谱官方API价格表](https://docs.bigmodel.cn/cn/guide/start/pricing)：`glm-4-flashx-250414`非缓存输入/输出均0.1元/百万token，`embedding-3`标准输入0.5元/百万token。[Embedding-3说明](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3)支持1024维及最多64条文本批量。代码默认模型恰为这两个，但未读取本机.env核对有效配置，也未用真实请求验证可用性。
