@@ -51,6 +51,15 @@
 - 实现及运行说明提交`b7f92fd61fe17288cc2d1d618611df88de2b0555`，仅4个具体路径，已普通推送origin/main。plan/journal收尾提交自身SHA由Git/memory/本聊天交接，避免自引用；README运行入口未变不改，无新daily/ADR/历史状态表同步。
 - 剩余/下一步：继续监听服务器与Playwright回调对接，让浏览器使用同一已启动app，接实际数据库审计与样本准备；旧Playwright子进程启动器未纳入守卫，96次全流程约束及人民币硬上限尚未完成。数据使用条件、有效模型/token/费用清单和真实调用许可仍未解决，无需用户重选阶段。新CI结果收尾另行只读核查，不预填成功。
 
+### 2026-10-29：共享app的回环HTTP桥与真实SSE验证
+
+- 延续ENG-05B/ENG-06，周四无例行调研、无新阶段决策。读取memory/README/plan/当前周journal/ADR0001和实际代码；根/父无AGENTS，本次不改前端。main起点e7a44cb3f05216dc39f703b3eee2dc0a35749849，gh核对远端一致；原8组未跟踪材料保持原样。补核昨日最终Backend40642574529、Frontend40642574376、Container40642574396均completed/success，不计今日重跑。
+- 原因：另起普通API进程会丢失共享guard。新增acceptance_server(app)，以lifespan=off借用编排器已启动的app，预绑定127.0.0.1随机端口再传socket，无端口选择竞态、子进程或信号接管；http_exercise将URL/run ID传给HTTP/浏览器回调，返回原回执给workflow审计。失败/取消后关闭监听，外层负责DB/SDK。未改旧Playwright配置，尚无浏览器进程/完整运行CLI。
+- 验证：Windows Python3.12.7常规进程，`.venv/Scripts/python.exe scripts/run_backend_tests.py`完整360 passed/1 POSIX skipped/3既有warnings，96.94s，退出0；全仓Ruff及diff/暂存检查通过。新增5场景，真实本地Uvicorn/httpx HTTP与SSE、异常/取消/启动失败，以及真实workflow/API/SDK+MockTransport集成；断言app创建一次、lifespan一次、DB关闭一次、共享chat1/embedding1，监听退出后is_serving=false且连接失败。存储和provider wire为替身，诊断路由只在测试存在。
+- 首轮专项3失败/1通过：成功SSE后关闭端口在Windows返回ConnectTimeout而非ConnectError，补监听器关闭直接断言并接受两种平台连接失败，不放宽成功HTTP/SSE/生命周期断言。禁用无关WebSocket协议插件。没有真实数据库/Milvus/模型/评论/浏览器/付费/凭据/发布；未复跑前端/容器/wheel。真实Ask/报告HTTP业务、Linux监听测试和持续不退出流的关闭尚未专项验证；优雅关闭等待后台请求2秒，不宣称已覆盖任意失控回调。
+- 实现及verification提交`027f57e6fd055b1bd7c5f77582b5ae96a872f4af`（4具体路径）已普通推送origin/main。plan/journal收尾提交自身SHA及最终推送由git/memory/本聊天交接，避免自引用。README运行入口未变不改；无新daily/ADR/历史状态表。今日可演示真实本地HTTP/SSE桥与共享计数，尚非真实业务E2E。
+- 下一步接Playwright回执与精确落库审计，继续样本使用条件、有效模型/token/费用清单。96次全流程与人民币硬上限未完成，真实调用授权未取得；当前无待用户重选的阶段问题。
+
 ## 2026-W43（10-19 至 10-25）
 
 ### 周度研究基线（流程迁移，不是新调研）
