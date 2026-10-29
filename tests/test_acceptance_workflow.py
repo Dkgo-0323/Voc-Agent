@@ -15,10 +15,55 @@ from openai import APIConnectionError
 from backend.app import main
 from scripts import seed_phase14_demo_data as demo
 from shared.acceptance.runtime import acceptance_adapters
+from shared.acceptance.server import http_exercise
 from shared.acceptance.transport import AcceptanceStopped, ProviderPolicy
 from shared.acceptance.workflow import RunRecord, run_business_acceptance
 
 POLICY = ProviderPolicy("https://provider.invalid/v4", "chat-test", "embed-test")
+
+
+@pytest.mark.asyncio
+async def test_http_bridge_uses_workflow_app_and_shared_quota(monkeypatch):
+    close = storage(monkeypatch)
+    wire = Wire()
+    record = RunRecord(str(uuid4()))
+    apps = []
+    original = main.create_app
+
+    def factory(**kwargs):
+        app = original(**kwargs)
+        apps.append(app)
+
+        @app.get("/test-shared-chat")
+        async def chat():
+            await app.state.acceptance_adapters.chat.complete(messages=[], tools=[])
+            return {"calls": app.state.acceptance_adapters.guard.summary()["outbound_attempts"]}
+
+        return app
+
+    monkeypatch.setattr("shared.acceptance.workflow.create_app", factory)
+
+    async def noop(adapters):
+        pass
+
+    async def browser(base_url, run_id):
+        async with httpx.AsyncClient(trust_env=False, timeout=3) as client:
+            response = await client.get(base_url + "/test-shared-chat")
+        assert response.status_code == 200
+        assert response.json()["calls"] == {"chat": 1, "embedding": 1}
+        assert close.await_count == 0
+        return receipts(run_id)
+
+    async def audit(*args):
+        assert close.await_count == 0
+
+    await run_business_acceptance(
+        record, POLICY, api_key="offline", transport=wire,
+        prepare=noop, seed=noop, exercise=http_exercise(browser), audit=audit,
+    )
+    assert len(apps) == 1 and close.await_count == 1
+    assert record.status == "completed" and wire.closed
+    assert record.provider["outbound_attempts"] == {"chat": 1, "embedding": 1}
 
 
 def receipts(run_id):

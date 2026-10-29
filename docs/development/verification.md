@@ -187,3 +187,13 @@ Playwright trace可能包含页面、网络、token与评论；只保留在忽�
 2026-10-22读取[智谱官方API价格表](https://docs.bigmodel.cn/cn/guide/start/pricing)：`glm-4-flashx-250414`非缓存输入/输出均0.1元/百万token，`embedding-3`标准输入0.5元/百万token。[Embedding-3说明](https://docs.bigmodel.cn/cn/guide/models/embedding/embedding-3)支持1024维及最多64条文本批量。代码默认模型恰为这两个，但未读取本机.env核对有效配置，也未用真实请求验证可用性。
 
 当前只保存价格快照/直接来源；总费用仍未知，不能用请求数直接乘token单价。下一步结合明确样本、实际provider/模型、输入及输出token边界、失败/重试策略给出可审阅清单和预算，再集中确认真实运行。不购买、不改凭据、不启worker/judge或发布。
+
+### 2026-10-29：同一应用的回环HTTP监听桥
+
+`shared/acceptance/server.py`提供`acceptance_server(app)`与`http_exercise(callback)`。编排器已持有app lifespan，监听桥以lifespan=off借用该app，预绑定127.0.0.1随机端口并把同一个socket交给Uvicorn，无子进程、信号处理或二次启动探测。HTTP/浏览器回调收到base URL与run ID，返回原有Ask/报告回执；可通过`exercise=http_exercise(callback)`接入workflow。回调必须使用传入URL，不启动旧Playwright API webServer。这里只接通服务器适配协议，未改现有Playwright配置或运行浏览器。
+
+真实回环HTTP测试收到SSE的shared/done事件，成功、异常与取消退出后监听器is_serving为false，后续连接失败，外层lifespan只开始/结束各一次。启动异常不暴露URL。编排集成使用真实FastAPI/Uvicorn/httpx/OpenAI SDK与MockTransport，存储为替身：启动embedding1次、HTTP诊断路由chat1次，累计计数相同，app仅创建一次、DB仅关闭一次。诊断路由只存在测试中。
+
+Windows Python3.12.7常规进程执行`.venv/Scripts/python.exe scripts/run_backend_tests.py`：360 passed/1 POSIX skipped/3既有warnings，96.94s；`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`通过。首轮专项3失败/1通过：成功HTTP之后，关闭端口返回ConnectTimeout而非测试预期的ConnectError；补充监听器关闭的直接断言，并接受两种平台连接失败表现，未放宽成功请求/SSE/生命周期断言。禁用不需要的WebSocket协议，避免加载额外协议插件。
+
+未验证真实数据库/Milvus/模型、Ask/报告HTTP业务端点、Playwright、跨平台Linux新监听测试、公开样本、预算与发布；未复跑本机前端/容器/wheel。真实监听和SSE不等于浏览器或真实语义验收。使用Uvicorn显式startup/shutdown生命周期接口，依赖升级需保持该回归；优雅关闭最多等待后台请求2秒，尚未专项验证持续不退出的流。下一步接Playwright回执及精确落库审计，继续核实数据条件与模型/token费用清单，真实运行另确认。
