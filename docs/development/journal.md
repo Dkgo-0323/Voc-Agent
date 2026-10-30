@@ -60,6 +60,15 @@
 - 实现及verification提交`027f57e6fd055b1bd7c5f77582b5ae96a872f4af`（4具体路径）已普通推送origin/main。plan/journal收尾提交自身SHA及最终推送由git/memory/本聊天交接，避免自引用。README运行入口未变不改；无新daily/ADR/历史状态表。今日可演示真实本地HTTP/SSE桥与共享计数，尚非真实业务E2E。
 - 下一步接Playwright回执与精确落库审计，继续样本使用条件、有效模型/token/费用清单。96次全流程与人民币硬上限未完成，真实调用授权未取得；当前无待用户重选的阶段问题。
 
+### 2026-10-30：共享数据库上下文的精确结果审计
+
+- 目标/原因：旧独立审计脚本自行init_db/close_db，直接嵌入共享运行会干扰API连接池；页面终态也不能证明当前数据库内容一致。新增shared/acceptance/audit.py的database_audit回调，借用应用会话，显式传数据集预期/引用范围，查询整个会话并复用audit_turns，再查最终报告并复用audit_report。只发SELECT，不初始化/关闭引擎，不保留正文/JWT；并非数据库权限隔离或语义质量判断。
+- 环境/验证：Windows Python3.12.7，常规隔离runner `.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_workflow.py`：20 passed/2既有warnings/81.02s；完整 `.venv/Scripts/python.exe scripts/run_backend_tests.py`：365 passed/1 POSIX skipped/3既有warnings/38.68s。全仓Ruff及git diff --check通过。新增五个编排集成场景：正常、额外消息、引用越界、旧报告、查询故障，断言session参数/排序、失败停止、会话退出、DB仅关闭一次、审计无额外模型请求。真实SQLAlchemy语句、审计函数、workflow及SDK+MockTransport，查询/报告仓库为替身。
+- 未验证：真实PostgreSQL/Milvus/模型/公开评论、Ask与报告真实HTTP业务、Playwright、本机前端/容器/wheel；未配置凭据/付费/发布。可演示离线拒绝额外消息/越界引用/旧报告，不称真实落库或业务效果验收。此前沙箱只读网络和Git索引写入被拒，授权常规执行随后成功，不是测试失败。
+- 起点main与远端3f43a525f29c2c4bb11447162a07c532ee09a827一致；可见聊天列表未见其他同仓库活跃开发，原8组未跟踪材料保留。补核昨日最终Backend40827880262、Frontend40827880278、Container40827880402均success，未当作今日重跑。
+- 实现及运行手册提交 `04329910069104d7ed02cfe7537b47d63c1df947` 已普通推送origin/main，仅三个具体文件；本条与plan收尾提交自身SHA由Git/memory/最终回复交接。README入口未变，无新daily/ADR/旧状态表维护。
+- 剩余/下一步：接Playwright回执到同一app监听URL并执行实际隔离数据库审计，补公开样本prepare；来源条件、有效模型/token费用清单、真实运行授权仍待满足，96次全流程及人民币硬上限未完成。继续ENG-05B/ENG-06，不重选阶段；本轮周五无例行调研。
+
 ## 2026-W43（10-19 至 10-25）
 
 ### 周度研究基线（流程迁移，不是新调研）
