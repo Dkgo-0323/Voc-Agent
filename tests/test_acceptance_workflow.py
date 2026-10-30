@@ -19,6 +19,84 @@ from shared.acceptance.server import http_exercise
 from shared.acceptance.transport import AcceptanceStopped, ProviderPolicy
 from shared.acceptance.workflow import RunRecord, run_business_acceptance
 
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [None, "extra_message", "citation", "stale_report", "query"])
+async def test_database_audit_in_workflow(monkeypatch, failure):
+    from shared.acceptance.audit import database_audit
+    from shared.acceptance.receipts import TurnExpectation
+    from shared.acceptance.reports import content_hash
+
+    close = storage(monkeypatch)
+    wire = Wire()
+    record = RunRecord(str(uuid4()))
+    ask, reports = receipts(record.run_id)
+    last = reports["reports"][-1]
+    last["content_sha256"] = content_hash("report", "summary")
+    expected = tuple(TurnExpectation(f"prompt {i}", frozenset(), status="success") for i in range(5))
+    messages = []
+    for turn, expectation in zip(ask["turns"], expected, strict=True):
+        for role, key in (("user", "user_message_id"), ("assistant", "assistant_message_id")):
+            messages.append(SimpleNamespace(
+                id=turn[key], session_id=turn["session_id"], role=role,
+                content=expectation.prompt, tool_calls={},
+                tool_results={"agent_status": "success"}, cited_ids={},
+            ))
+    if failure == "extra_message":
+        messages.append(messages[-1])
+    if failure == "citation":
+        messages[1].cited_ids = {"mention_ids": [str(uuid4())]}
+    stored = SimpleNamespace(**last, report_md="report", summary="summary")
+    if failure == "stale_report":
+        stored.generated_at = reports["reports"][0]["generated_at"]
+    statements, exits = [], []
+
+    async def scalars(statement):
+        statements.append(statement)
+        if failure == "query":
+            raise RuntimeError("database unavailable")
+        return SimpleNamespace(all=lambda: messages)
+
+    session = SimpleNamespace(scalars=scalars)
+
+    @asynccontextmanager
+    async def context():
+        assert close.await_count == 0
+        try:
+            yield session
+        finally:
+            exits.append(True)
+
+    report_read = AsyncMock(return_value=stored)
+    monkeypatch.setattr("shared.acceptance.audit.ReportRepository.get_weekly_report", report_read)
+    audit = database_audit(context, expectations=expected, allowed_mention_ids=set())
+
+    async def noop(adapters):
+        pass
+
+    async def exercise(app, run_id):
+        return ask, reports
+
+    async def run():
+        await run_business_acceptance(
+            record, POLICY, api_key="offline", transport=wire,
+            prepare=noop, seed=noop, exercise=exercise, audit=audit,
+        )
+
+    if failure:
+        with pytest.raises(RuntimeError if failure == "query" else ValueError):
+            await run()
+        assert record.status == "failed" and record.provider["stopped"]
+    else:
+        await run()
+        assert record.status == "completed"
+    assert exits == [True] and close.await_count == 1 and wire.closed
+    assert record.provider["outbound_attempts"] == {"chat": 0, "embedding": 1}
+    statement = statements[0]
+    assert str(statement.compile().params["session_id_1"]) == ask["turns"][0]["session_id"]
+    assert "ORDER BY chat_messages.created_at, chat_messages.id" in str(statement)
+    assert report_read.await_count == (0 if failure in {"extra_message", "citation", "query"} else 1)
+
 POLICY = ProviderPolicy("https://provider.invalid/v4", "chat-test", "embed-test")
 
 

@@ -197,3 +197,11 @@ Playwright trace可能包含页面、网络、token与评论；只保留在忽�
 Windows Python3.12.7常规进程执行`.venv/Scripts/python.exe scripts/run_backend_tests.py`：360 passed/1 POSIX skipped/3既有warnings，96.94s；`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`通过。首轮专项3失败/1通过：成功HTTP之后，关闭端口返回ConnectTimeout而非测试预期的ConnectError；补充监听器关闭的直接断言，并接受两种平台连接失败表现，未放宽成功请求/SSE/生命周期断言。禁用不需要的WebSocket协议，避免加载额外协议插件。
 
 未验证真实数据库/Milvus/模型、Ask/报告HTTP业务端点、Playwright、跨平台Linux新监听测试、公开样本、预算与发布；未复跑本机前端/容器/wheel。真实监听和SSE不等于浏览器或真实语义验收。使用Uvicorn显式startup/shutdown生命周期接口，依赖升级需保持该回归；优雅关闭最多等待后台请求2秒，尚未专项验证持续不退出的流。下一步接Playwright回执及精确落库审计，继续核实数据条件与模型/token费用清单，真实运行另确认。
+
+### 2026-10-30：借用应用会话的数据库审计回调
+
+`shared/acceptance/audit.py` 的 `database_audit(get_db_context, expectations=..., allowed_mention_ids=...)` 返回可直接传给 `run_business_acceptance(audit=...)` 的回调。必须传入当前数据集的五轮预期与允许引用ID，不隐式使用202403合成样本。调用者应使用已启动应用的会话上下文；回调不调用init_db/close_db，也不创建模型客户端。这里只执行SELECT，事务与连接由传入上下文管理；并非数据库权限级只读沙箱。
+
+Ask与报告回执先检查run ID和结构；按session ID读取整个会话并按created_at/id排序，复用audit_turns核对消息数量、身份、prompt、工具、状态和引用范围，然后按SKU/周查询当前报告，复用audit_report核对报告ID、最终时间与内容SHA256。多余会话消息也会失败，不能只查询回执列出的消息来规避；摘要校验不判断语义质量。失败由workflow锁定共享guard并关闭外层资源，不撤销已提交数据。不记录正文/JWT。
+
+专项命令：`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_workflow.py`，Windows Python3.12.7常规进程、空cwd/应用环境隔离，20 passed / 2既有warnings，81.02s。新增五个编排集成场景：正常、额外消息、引用越界、旧报告、查询异常；断言会话查询参数与排序、会话退出、失败状态/停止标记、DB仅关闭一次、无审计模型请求（仅启动embedding一次）。真实SQLAlchemy语句/审计函数/workflow/SDK+MockTransport，查询返回与报告仓库为替身；尚无真实PostgreSQL/Milvus/HTTP业务/浏览器/模型/公开数据验收。本机前端、容器及wheel未复跑。下一步将Playwright回执接入同一监听URL，补实际隔离数据库审计运行；数据条件及真实调用授权仍须满足。
