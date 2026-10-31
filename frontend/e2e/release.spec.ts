@@ -1,6 +1,10 @@
 import { expect, test, type Page } from "@playwright/test";
+import path from "node:path";
+import { browserConfiguration } from "./runtime.mjs";
 import { writeFile } from "node:fs/promises";
 import { askReceipt, reportReceipt, type AskReceipt } from "./receipt";
+
+const config = browserConfiguration(process.env);
 
 const password = process.env.PHASE14_ADMIN_PASSWORD;
 
@@ -44,7 +48,7 @@ test.describe.serial("Phase 14 release verification", () => {
     await expect(page.getByLabel("SKU B")).toHaveValue("jackery-explorer-1000");
 
     const token = await page.evaluate(() => localStorage.getItem("voc.access-token"));
-    const invalid = await page.request.get("http://127.0.0.1:8014/api/compare?sku_code=ecoflow-delta2&sku_code=anker-solix-f2000&week_id=202403", {
+    const invalid = await page.request.get(`${config.apiBaseUrl}/api/compare?sku_code=ecoflow-delta2&sku_code=anker-solix-f2000&week_id=202403`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(invalid.status()).toBe(400);
@@ -78,9 +82,9 @@ test.describe.serial("Phase 14 release verification", () => {
     expect(second.week_id).toBe(first.week_id);
     expect(Date.parse(second.generated_at)).toBeGreaterThan(Date.parse(first.generated_at));
     await expect(page.getByText("Weekly report available")).toBeVisible({ timeout: 120_000 });
-    const receiptPath = testInfo.outputPath("report-receipt.json");
+    const receiptPath = process.env.PHASE14_RECEIPT_DIR ? path.join(process.env.PHASE14_RECEIPT_DIR, "report-receipt.json") : testInfo.outputPath("report-receipt.json");
     await writeFile(receiptPath, JSON.stringify({ schema_version: 1,
-      run_id: process.env.PHASE14_RUN_ID, reports: [first, second] }, null, 2));
+      run_id: process.env.PHASE14_RUN_ID, reports: [first, second] }, null, 2), { flag: "wx" });
     await testInfo.attach("report-receipt", { path: receiptPath, contentType: "application/json" });
   });
 
@@ -98,9 +102,9 @@ test.describe.serial("Phase 14 release verification", () => {
     turns.push(await ask(page, "Use tool_rag to check what evidence exists for ecoflow-delta2 in ISO week 202452."));
     await expect(page.getByText("No matching VOC data was found for this request.")).toBeVisible();
     expect(new Set(turns.map((turn) => turn.session_id)).size).toBe(1);
-    const receiptPath = testInfo.outputPath("ask-receipt.json");
+    const receiptPath = process.env.PHASE14_RECEIPT_DIR ? path.join(process.env.PHASE14_RECEIPT_DIR, "ask-receipt.json") : testInfo.outputPath("ask-receipt.json");
     await writeFile(receiptPath, JSON.stringify({ schema_version: 1,
-      run_id: process.env.PHASE14_RUN_ID, turns }, null, 2));
+      run_id: process.env.PHASE14_RUN_ID, turns }, null, 2), { flag: "wx" });
     await testInfo.attach("ask-receipt", { path: receiptPath, contentType: "application/json" });
   });
 

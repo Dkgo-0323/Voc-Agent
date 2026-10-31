@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { backendPython, liveConfiguration } from "../e2e/runtime.mjs";
+import { backendPython, browserConfiguration, liveConfiguration } from "../e2e/runtime.mjs";
 import { askReceipt, reportReceipt } from "../e2e/receipt";
 
 const runId = "11111111-1111-4111-8111-111111111111";
@@ -63,5 +63,23 @@ describe("report receipts", () => {
     'event: error\ndata: {"event_type":"error"}\n\n' + stream,
   ])("rejects failed or incomplete report streams %#", (body) => {
     expect(() => reportReceipt(body)).toThrow();
+  });
+});
+
+
+describe("shared API browser configuration", () => {
+  it("borrows only a loopback origin with an absolute receipt destination", () => {
+    const shared = { ...env, PHASE14_API_BASE_URL: "http://127.0.0.1:43210",
+      PHASE14_RECEIPT_DIR: process.cwd() };
+    expect(browserConfiguration(shared)).toMatchObject({ external: true,
+      apiBaseUrl: shared.PHASE14_API_BASE_URL });
+    expect(browserConfiguration(env).external).toBe(false);
+    for (const value of ["", "http://remote:1234", "http://127.0.0.1:0",
+      "http://127.0.0.1:99999", "http://user:pass@127.0.0.1:1234",
+      "http://127.0.0.1:1234/path", "http://127.0.0.1:1234?x=1"]) {
+      expect(() => browserConfiguration({ ...shared, PHASE14_API_BASE_URL: value })).toThrow();
+    }
+    expect(() => browserConfiguration({ ...shared, PHASE14_RECEIPT_DIR: "relative" })).toThrow();
+    expect(() => browserConfiguration({ ...shared, PHASE14_ALLOW_LIVE: "0" })).toThrow();
   });
 });

@@ -233,5 +233,5 @@ Pop-Location
 - [验证证据与适用范围](docs/validation-evidence.md)
 - [截图来源与复现](docs/images/README.md)
 - [详细架构](docs/arch.md)与[数据契约](docs/data_contracts.md)
-- [容器交付](ops/README.md)与[验收命令](docs/development/verification.md)
+- [容器交付](ops/README.md)与[验收命令](docs/development/verification.md)（含Playwright借用共享API与回执交接；完整受控浏览器运行器尚待接通）
 - [当前计划](docs/development/plan.md)与[交付记录](docs/development/journal.md)

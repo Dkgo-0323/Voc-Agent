@@ -36,3 +36,23 @@ export function backendPython(root, platform = process.platform, override, exist
   if (!exists(python)) throw new Error("Acceptance Python is missing; install dependencies or set PHASE14_PYTHON.");
   return python;
 }
+
+// External mode borrows the workflow listener; it must never launch another API.
+export function browserConfiguration(env) {
+  const live = liveConfiguration(env);
+  const external = env.PHASE14_API_BASE_URL !== undefined;
+  let apiBaseUrl = "http://127.0.0.1:8014";
+  if (external) {
+    const value = env.PHASE14_API_BASE_URL;
+    if (!/^http:\/\/127\.0\.0\.1:[1-9][0-9]{0,4}$/.test(value ?? "")) {
+      throw new Error("External API must be an explicit loopback HTTP origin.");
+    }
+    const url = new URL(value);
+    if (Number(url.port || 80) > 65535) throw new Error("Invalid API port.");
+    apiBaseUrl = url.origin;
+    if (!path.isAbsolute(env.PHASE14_RECEIPT_DIR ?? "")) {
+      throw new Error("External API mode requires an absolute fresh receipt directory.");
+    }
+  }
+  return { ...live, external, apiBaseUrl };
+}

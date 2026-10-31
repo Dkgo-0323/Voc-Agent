@@ -205,3 +205,12 @@ Windows Python3.12.7常规进程执行`.venv/Scripts/python.exe scripts/run_back
 Ask与报告回执先检查run ID和结构；按session ID读取整个会话并按created_at/id排序，复用audit_turns核对消息数量、身份、prompt、工具、状态和引用范围，然后按SKU/周查询当前报告，复用audit_report核对报告ID、最终时间与内容SHA256。多余会话消息也会失败，不能只查询回执列出的消息来规避；摘要校验不判断语义质量。失败由workflow锁定共享guard并关闭外层资源，不撤销已提交数据。不记录正文/JWT。
 
 专项命令：`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_workflow.py`，Windows Python3.12.7常规进程、空cwd/应用环境隔离，20 passed / 2既有warnings，81.02s。新增五个编排集成场景：正常、额外消息、引用越界、旧报告、查询异常；断言会话查询参数与排序、会话退出、失败状态/停止标记、DB仅关闭一次、无审计模型请求（仅启动embedding一次）。真实SQLAlchemy语句/审计函数/workflow/SDK+MockTransport，查询返回与报告仓库为替身；尚无真实PostgreSQL/Milvus/HTTP业务/浏览器/模型/公开数据验收。本机前端、容器及wheel未复跑。下一步将Playwright回执接入同一监听URL，补实际隔离数据库审计运行；数据条件及真实调用授权仍须满足。
+
+
+### 2026-10-31：Playwright借用共享API与回执交接
+
+`browserConfiguration`识别显式`PHASE14_API_BASE_URL=http://127.0.0.1:<port>`，仅允许无路径、凭据或查询的回环HTTP origin。外部模式删除Playwright的backend webServer，只构建/启动3014上的Next前端，将同一URL作为`NEXT_PUBLIC_API_BASE_URL`构建参数；测试中的直接compare请求也使用该URL。Next公开环境变量在构建时写入浏览器包，不能只在start时替换。未传该变量保留旧独立启动方式；live opt-in、run UUID和隔离目标校验始终执行，设置变量不构成真实运行授权。
+
+外部模式必须指定绝对路径`PHASE14_RECEIPT_DIR`。调用者应为每次run创建新的空目录；套件使用wx独占写入ask-receipt.json与report-receipt.json，旧文件存在则失败，不覆盖或读取历史结果。外层回调仍需检查Playwright退出码为0、读取两份回执并核对run ID，然后交给workflow/audit；目前自动启动子进程和读取两份JSON的Python回调尚未实现。外部模式关闭trace，避免额外保存响应/认证信息；不得把完整浏览器产物或正文提交Git。仍为202403合成场景，尚未参数化公开数据预期。
+
+离线校验使用占位密码/本地目标，`node node_modules/@playwright/test/cli.js test --list`成功收集4用例，未启动服务、浏览器或模型。Node直接配置检查8断言通过；Vitest配置/SSE专项20通过。完整前端门禁结果见journal。没有真实模型、数据库、Milvus或浏览器业务验收；未运行后端/容器/wheel。下一步补共享监听上下文内的浏览器进程生命周期与回执读取，然后执行无真实provider的集成闭环；数据条件和真实调用清单另行处理。
