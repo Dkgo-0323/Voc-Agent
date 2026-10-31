@@ -69,6 +69,17 @@
 - 实现及运行手册提交 `04329910069104d7ed02cfe7537b47d63c1df947` 已普通推送origin/main，仅三个具体文件；本条与plan收尾提交自身SHA由Git/memory/最终回复交接。README入口未变，无新daily/ADR/旧状态表维护。
 - 剩余/下一步：接Playwright回执到同一app监听URL并执行实际隔离数据库审计，补公开样本prepare；来源条件、有效模型/token费用清单、真实运行授权仍待满足，96次全流程及人民币硬上限未完成。继续ENG-05B/ENG-06，不重选阶段；本轮周五无例行调研。
 
+
+### 2026-10-31：Playwright共享API模式与回执出口
+
+- 目标/原因：旧Playwright配置固定另启8014后端，即便workflow已有共享app，也会绕过总额度。新增browserConfiguration校验动态回环origin；外部模式删除backend webServer，Next构建和直接compare请求使用相同URL；不改变生产接口/模型配置。独立模式保留，真实运行opt-in/UUID/隔离目标检查不跳过。
+- 回执：调用方须创建新的绝对目录，Ask/报告回执使用wx独占写入，拒绝覆盖旧结果；仅存ID/范围/时间/摘要，不保存正文或JWT。关闭外部模式trace并显式零重试。Python启动浏览器/读取两份JSON/校验退出码再交给audit的回调尚未完成，不能把配置接线称完整运行器。
+- 实际验证：Windows Node22.15.0；`npm test -- --maxWorkers=2 --minWorkers=1`为9文件55 passed/59.48s；专项`node node_modules/vitest/vitest.mjs run tests/acceptance-runtime.test.ts --pool=threads --maxWorkers=1 --minWorkers=1`为20 passed/67.39s；`npm run typecheck`成功。Node无依赖配置检查8断言通过；占位密码/本地目标下`node node_modules/@playwright/test/cli.js test --list`退出0、收集4用例，无服务/浏览器启动。本次四个前端文件定向ESLint及完整`npm run lint`均退出0；4份Markdown共42个本地链接和git diff --check通过。
+- 排障：首次编辑脚本遇默认编码解码异常，重试编辑引入重复import/config声明，tsc明确报错后已消除并完整重跑类型检查。初次沙箱完整前端运行无统计主动中断；常规完整首轮已打印部分成功但尚无总统计时中断，均退出1不计通过。随后降低并发完整55通过，未弱化业务断言。
+- 基线/保护：main起点45351c3c212d79f1206e5ed6ee35fd05c633256a，gh核实远端一致；读取frontend/AGENTS及本地Next环境变量指南，根/父无AGENTS。可见其他同仓库聊天未活跃，原8组未跟踪材料不读取正文、不暂存。补核昨日最终Backend41015739382、Frontend41015739433、Container41015739402全部success，属于昨日CI。
+- 未验证：浏览器交互、Next生产build、真实API/数据库/Milvus/模型/公开评论/费用与发布；本轮无后端代码变化，未复跑后端/容器/wheel。新增可演示能力为无需凭据的共享URL配置反例和套件收集。下一步浏览器进程生命周期及回执读取，再做无真实provider集成；来源条件、模型/token费用清单和真实调用许可未解决，阶段不变，无需重选。
+- 实现/README/运行说明提交`5b3ccd80723ca43c078169fa74a6eb6c2fd42446`已普通推送origin/main，只有6个具体路径。14:12快照Frontend41175616481、Backend41175616485、Container41175616475均in_progress，未预填成功；plan/journal收尾提交自身SHA由memory与最终回复提供。无新daily/ADR/历史三表同步。
+
 ## 2026-W43（10-19 至 10-25）
 
 ### 周度研究基线（流程迁移，不是新调研）
