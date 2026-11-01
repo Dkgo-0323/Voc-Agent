@@ -80,6 +80,14 @@
 - 未验证：浏览器交互、Next生产build、真实API/数据库/Milvus/模型/公开评论/费用与发布；本轮无后端代码变化，未复跑后端/容器/wheel。新增可演示能力为无需凭据的共享URL配置反例和套件收集。下一步浏览器进程生命周期及回执读取，再做无真实provider集成；来源条件、模型/token费用清单和真实调用许可未解决，阶段不变，无需重选。
 - 实现/README/运行说明提交`5b3ccd80723ca43c078169fa74a6eb6c2fd42446`已普通推送origin/main，只有6个具体路径。14:12快照Frontend41175616481、Backend41175616485、Container41175616475均in_progress，未预填成功；plan/journal收尾提交自身SHA由memory与最终回复提供。无新daily/ADR/历史三表同步。
 
+### 2026-11-01：浏览器进程生命周期与本次回执校验
+
+- 延续ENG-05B/ENG-06，周日无例行研究/新阶段决策。读取memory、README、plan、本周journal、ADR0001及相关代码；根/父无AGENTS，本轮不改frontend。main起点b158529d5338d6658dc8dcb296c6f0fba36c41c5，gh核实远端一致；可见聊天列表无其他同仓库活跃开发，原8组未跟踪材料保留。昨日最终Backend41175661356/Frontend41175661548/Container41175661367均completed/success，属于历史CI。
+- 场景：浏览器失败可能留下回执，旧run文件也可能被误读。新增browser_exercise，可组合http_exercise后交给workflow；绝对可执行文件/目录、无shell、显式环境不继承父应用配置；每次临时新目录。超时/取消终止仍运行的进程树并等待退出；只接受退出码0、两份不超过64KiB的JSON、本次run ID、五轮Ask和两次报告元数据。失败传播到workflow停止guard，成功回执继续交给数据库audit；本模块不自行启用live或授权真实请求。进程输出丢弃，避免保留JWT/正文，诊断只含退出码。
+- 验证环境Windows Python3.12.7：`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_browser.py`为8 passed/2.52s；完整`.venv/Scripts/python.exe scripts/run_backend_tests.py`为373 passed/1 POSIX skipped/3既有warnings/31.22s。全仓Ruff与git diff/暂存检查通过。真实本地Python子进程覆盖成功、非零退出、缺文件、旧run、超大文件、超时、取消，并断言显式URL/UUID、父环境哨兵不继承、进程退出/临时目录清理。初次Ruff提示suppress写法已修复；沙箱专项/完整两次无输出主动中断退出1，不计通过，随后常规隔离runner完成。
+- 边界：没有真实Playwright、Next build、数据库/Milvus/模型/公开评论/费用/发布；未复跑前端/容器/wheel。尚未验证Linux进程组、真实浏览器孙进程、父进程先退出后孤儿进程清理。当前仅回调组件与子进程验收，不称完整真实业务运行器或人民币硬上限；数据条件、模型/token费用清单及真实运行授权仍未解决。下步接无真实provider浏览器集成和公开样本预期参数化，无需重选阶段。
+- 实现及运行手册提交`4bba798d565316eb355364c0735cafbf59c40453`已普通推送origin/main，仅3个具体路径。plan/journal收尾提交自身SHA由Git/memory/最终回复交接。README入口未变不改，无新daily/ADR/旧表维护；用户材料、凭据、运行产物不暂存。本次新CI状态另行快照，不预填成功。
+
 ## 2026-W43（10-19 至 10-25）
 
 ### 周度研究基线（流程迁移，不是新调研）
