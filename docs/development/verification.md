@@ -214,3 +214,13 @@ Ask与报告回执先检查run ID和结构；按session ID读取整个会话并�
 外部模式必须指定绝对路径`PHASE14_RECEIPT_DIR`。调用者应为每次run创建新的空目录；套件使用wx独占写入ask-receipt.json与report-receipt.json，旧文件存在则失败，不覆盖或读取历史结果。外层回调仍需检查Playwright退出码为0、读取两份回执并核对run ID，然后交给workflow/audit；目前自动启动子进程和读取两份JSON的Python回调尚未实现。外部模式关闭trace，避免额外保存响应/认证信息；不得把完整浏览器产物或正文提交Git。仍为202403合成场景，尚未参数化公开数据预期。
 
 离线校验使用占位密码/本地目标，`node node_modules/@playwright/test/cli.js test --list`成功收集4用例，未启动服务、浏览器或模型。Node直接配置检查8断言通过；Vitest配置/SSE专项20通过。完整前端门禁结果见journal。没有真实模型、数据库、Milvus或浏览器业务验收；未运行后端/容器/wheel。下一步补共享监听上下文内的浏览器进程生命周期与回执读取，然后执行无真实provider的集成闭环；数据条件和真实调用清单另行处理。
+
+### 2026-11-01：Python浏览器进程与回执回调
+
+`shared.acceptance.browser.browser_exercise`返回`http_exercise`所需的异步回调。组合为`exercise=http_exercise(browser_exercise(...))`，再交给`run_business_acceptance`；共享监听URL及run ID会覆盖子进程环境中的对应值。传入绝对Node可执行文件和Playwright CLI路径、frontend工作目录、显式环境字典和已存在的绝对receipt_root。环境不会从父进程自动复制，不自动设置live opt-in；调用者仍须提供已授权的隔离目标和运行配置。本模块无CLI，不会自行启动真实验收。
+
+每次创建临时空目录，进程正常退出后读取ask-receipt.json/report-receipt.json，每份最多64KiB，验证本次run UUID、五轮Ask及两次报告元数据；异常直接传播给workflow，停止guard，不进入数据库audit。无shell，输入/输出重定向到DEVNULL，不将JWT或模型错误输出存入日志；代价是失败只给退出码，定位时需另行使用脱敏诊断。临时回执在所有退出路径移除，成功后的字典继续交给workflow和数据库审计。
+
+超时/取消时，仍运行的子进程使用Windows taskkill /T /F或POSIX独立进程组SIGKILL终止并等待退出。正常退出依赖Playwright自行清理Next/浏览器；尚未验证父进程提前退出后遗留的孙进程、真实浏览器进程树或Linux分支，不将其称为任意进程隔离。命令/回调属于可信集成代码。
+
+离线专项：Windows Python3.12.7，`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_browser.py`，8 passed/2.52s。真实本地Python子进程覆盖成功、非零退出、缺回执、旧run、超大文件、超时、取消，并断言父环境哨兵未继承、子进程退出和临时目录删除；没有浏览器/数据库/模型。完整回归结果见journal。
