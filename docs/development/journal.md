@@ -2,6 +2,29 @@
 
 按北京时间、ISO周组织周报与日更；当前目标/优先级只维护 [plan](plan.md)，运行入口见 [根README](../../README.md)。保留已确认决定和真实交付，不复制三份状态表。
 
+## 2026-W45（11-02 至 11-08）
+
+### 周一研究与本周方案（2026-11-02）
+
+访问日期均为2026-11-02；以下是本次重新访问，不能把索引的新抓取日期当岗位发布日期或确认仍有名额。
+
+- [小红书22021：2027校招AI应用](https://job.xiaohongshu.com/campus/position/22021)：官方搜索索引可读对话/上下文、Tool/RAG、结果解析、评测与Badcase要求；详情直接打开零行。沿用上周样本进行复核，非新增完整JD；发布日期未知。
+- [小红书21966：2027校招AI Agent工程师（质效研发）](https://job.xiaohongshu.com/campus/position/21966)：官方索引可读受控环境任务执行、用例验证、诊断及工程基础设施要求；详情零行，资格条件未完整取得、发布日期未知。不据此扩大到多Agent架构。
+- [蔚来：校招Agent应用开发工程师（社区）](https://nio.jobs.feishu.cn/campus/position/7673028746206677267/detail)：官方索引标2027届正式批，描述UI、业务编排、接口、数据、集成、效果验证的端到端开发；详情零行，发布日期未知。非完整实时JD核验。两企业样本有限，不能代表Python岗位市场。
+- [FastAPI template Playwright工作流](https://github.com/fastapi/full-stack-fastapi-template/blob/master/.github/workflows/playwright.yml)：读取分支文件，参考真实服务准备、失败判定及报告汇总；gh查询当时master为`f4bcfaba7c85be3c6332cc74a20819f586dcdbc6`，固定SHA raw访问cache miss，未取得固定版本正文，不能声称已逐字核实该SHA。借鉴集成门禁，不照搬分片并发、trace保留或compose清卷操作。
+- [Langfuse Python experiment.py](https://github.com/langfuse/langfuse-python/blob/main/langfuse/experiment.py)：读取分支模块，继续参考结构化实验结果与评测边界；gh查询main为`1fc854dd2b241cf8e3dac38bfd5907ff2fe365e3`，固定SHA raw同样未取得。不引入SDK或遥测；本周主要采用前一项集成验证思路，避免重复上周错误策略研究冒充新发现。两项目发布日期未核实。
+
+判断：官网索引继续强调可验证的工程闭环，对应本仓库缺口是各适配器独立通过但尚无真实浏览器/存储端到端证据。证据不足以改变阶段，继续ENG-05B/ENG-06；优先组合验证和样本预期参数化，不扩大架构。本周阶段目标为可复核、无真实provider的组合验收，再补真实运行前置条件。候选交付：①子进程→共享HTTP→回执→审计组合门禁（今日完成）；②Playwright与样本预期配置接线；③隔离存储集成和来源条件/有效模型/token费用清单。依赖：浏览器运行环境、隔离存储及来源条件；真实模型必须另获授权。验收：单一API生命周期/累计额度、失败阻断审计、资源关闭、精确run身份，并区分替身与真实服务。不承诺本周完成真实模型或上线。
+
+### 2026-11-02：子进程、HTTP与工作流组合门禁
+
+- 原因：单测分别证明浏览器进程、HTTP桥和workflow可用，仍可能组合时另启API、错误回执进入审计或资源提前关闭。今天新增4个跨边界回归：正常、旧run ID、子进程exit7、审计失败。真实Python子进程用stdlib HTTP访问测试专用路由，该路由调用同一个验收chat适配器；返回合成五轮Ask/两次报告回执，经browser_exercise/http_exercise进入workflow。不新增生产路由或默认live入口。
+- 关键断言：只构造一次app；启动embedding1、HTTP chat1，共享统计不重置；旧run/exit7不进入audit；审计失败整轮failed且guard停止；所有路径DB关闭一次、SDK transport关闭、监听不再serving、临时回执目录为空。正常audit接收到与本轮完全相同回执。
+- 实测Windows Python3.12.7：`.venv/Scripts/python.exe scripts/run_backend_tests.py`在常规授权进程执行，空cwd/清理应用环境，**377 passed / 1 POSIX skipped / 3既有warnings，35.34s，退出0**。全仓`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`通过；导入排序修正1项；`git diff --check`通过。最初沙箱专项无输出后中断退出1，不计通过，完整运行包含全部新增用例。
+- 验证边界：真实子进程/回环HTTP/Uvicorn/FastAPI生命周期/OpenAI SDK，模型wire与存储为替身；audit为AsyncMock，只验接线与失败传播，真实SQL审计另有既有回归。不等于真实Ask端点、真实浏览器、DB/Milvus持久化或语义效果。未跑前端/build/容器/wheel；未读评论正文、调用真实模型、配置凭据、付费或发布。
+- 起点main `3c66ca905983f2f9e398969057c166b9b3788647`与gh远端一致；补核其Backend41279389934、Frontend41279390023、Container41279389878均success（昨日证据，非今日重跑）。原8组未跟踪材料保留。父/根无AGENTS，本轮未改frontend；未核实其他聊天活跃状态，不宣称已核实无并行开发。只提交本次具体路径。
+- 可演示：无凭据运行上述测试，解释跨进程HTTP请求如何仍使用父进程同一guard及精确回执门禁。阶段未完成：真实Playwright/存储组合、公开样本参数化、来源使用条件、有效模型token费用清单及真实运行授权仍待；96次全流程与人民币硬上限未验收。下一步优先样本配置与实际浏览器无provider组合。提交SHA/普通推送结果在下方交接补充；新CI未预填通过。
+
 ## 2026-W44（10-26 至 11-01）
 
 ### 周一研究与本周方案（2026-10-26）

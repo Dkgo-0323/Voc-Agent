@@ -2,6 +2,8 @@
 
 import asyncio
 import json
+import os
+import sys
 from contextlib import asynccontextmanager
 from dataclasses import asdict
 from types import SimpleNamespace
@@ -14,6 +16,7 @@ from openai import APIConnectionError
 
 from backend.app import main
 from scripts import seed_phase14_demo_data as demo
+from shared.acceptance.browser import browser_exercise
 from shared.acceptance.runtime import acceptance_adapters
 from shared.acceptance.server import http_exercise
 from shared.acceptance.transport import AcceptanceStopped, ProviderPolicy
@@ -98,6 +101,80 @@ async def test_database_audit_in_workflow(monkeypatch, failure):
     assert report_read.await_count == (0 if failure in {"extra_message", "citation", "query"} else 1)
 
 POLICY = ProviderPolicy("https://provider.invalid/v4", "chat-test", "embed-test")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("failure", [None, "stale", "audit", "exit"])
+async def test_child_http_receipts_and_audit_share_one_workflow(tmp_path, monkeypatch, failure):
+    """Real child + HTTP + SDK; test-only route, synthetic receipts and storage."""
+    close = storage(monkeypatch)
+    wire, record = Wire(), RunRecord(str(uuid4()))
+    ask, reports = receipts(record.run_id)
+    apps, listeners = [], []
+    original = main.create_app
+
+    def factory(**kwargs):
+        app = original(**kwargs)
+        apps.append(app)
+
+        @app.get("/test-child-receipts")
+        async def endpoint():
+            assert close.await_count == 0
+            await app.state.acceptance_adapters.chat.complete(messages=[], tools=[])
+            return {"ask": ask, "reports": reports}
+
+        return app
+
+    monkeypatch.setattr("shared.acceptance.workflow.create_app", factory)
+    import uvicorn
+    startup = uvicorn.Server.startup
+
+    async def capture(self, sockets):
+        await startup(self, sockets)
+        listeners.extend(self.servers)
+
+    monkeypatch.setattr(uvicorn.Server, "startup", capture)
+    child = tmp_path / "http_child.py"
+    child.write_text('''import json, os, pathlib, sys, urllib.request
+url = os.environ["PHASE14_API_BASE_URL"]
+opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+with opener.open(url + "/test-child-receipts", timeout=5) as response:
+    payload = json.load(response)
+if sys.argv[1] == "exit":
+    sys.exit(7)
+assert payload["ask"]["run_id"] == os.environ["PHASE14_RUN_ID"]
+if sys.argv[1] == "stale":
+    payload["ask"]["run_id"] = "00000000-0000-0000-0000-000000000000"
+root = pathlib.Path(os.environ["PHASE14_RECEIPT_DIR"])
+for name, key in (("ask", "ask"), ("report", "reports")):
+    (root / (name + "-receipt.json")).write_text(json.dumps(payload[key]))
+''', encoding="utf-8")
+    root = tmp_path / "receipts"
+    root.mkdir()
+    callback = browser_exercise(
+        [sys.executable, str(child), str(failure)], cwd=tmp_path,
+        environment={k: v for k, v in os.environ.items()
+                     if k.upper() in {"SYSTEMROOT", "WINDIR", "PATH"}},
+        receipt_root=root, timeout=15,
+    )
+    audit = AsyncMock(side_effect=ValueError("audit mismatch") if failure == "audit" else None)
+    noop = AsyncMock()
+    kwargs = dict(api_key="offline", transport=wire, prepare=noop, seed=noop,
+                  exercise=http_exercise(callback), audit=audit)
+    if failure:
+        with pytest.raises(RuntimeError if failure == "exit" else ValueError):
+            await run_business_acceptance(record, POLICY, **kwargs)
+        assert record.status == "failed" and record.provider["stopped"]
+    else:
+        await run_business_acceptance(record, POLICY, **kwargs)
+        assert record.status == "completed" and not record.provider["stopped"]
+        audit.assert_awaited_once_with(ask, reports, record.run_id)
+    if failure in {"stale", "exit"}:
+        audit.assert_not_awaited()
+    assert len(apps) == 1 and close.await_count == 1 and wire.closed
+    assert record.provider["outbound_attempts"] == {"chat": 1, "embedding": 1}
+    assert listeners and all(not listener.is_serving() for listener in listeners)
+    assert list(root.iterdir()) == []
 
 
 @pytest.mark.asyncio
