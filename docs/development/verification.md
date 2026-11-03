@@ -224,3 +224,11 @@ Ask与报告回执先检查run ID和结构；按session ID读取整个会话并�
 超时/取消时，仍运行的子进程使用Windows taskkill /T /F或POSIX独立进程组SIGKILL终止并等待退出。正常退出依赖Playwright自行清理Next/浏览器；尚未验证父进程提前退出后遗留的孙进程、真实浏览器进程树或Linux分支，不将其称为任意进程隔离。命令/回调属于可信集成代码。
 
 离线专项：Windows Python3.12.7，`.venv/Scripts/python.exe scripts/run_backend_tests.py tests/test_acceptance_browser.py`，8 passed/2.52s。真实本地Python子进程覆盖成功、非零退出、缺回执、旧run、超大文件、超时、取消，并断言父环境哨兵未继承、子进程退出和临时目录删除；没有浏览器/数据库/模型。完整回归结果见journal。
+
+### 2026-11-03：整轮验收截止时间
+
+`run_business_acceptance(..., timeout=600)`使用单个asyncio截止时间覆盖prepare、两次seed、API lifespan启动、exercise、回执与数据库audit，以及正常关闭。必须为有限正秒数；非法值在创建SDK/修改RunRecord前拒绝。浏览器自己的timeout仍保留，实际先到的截止时间触发取消；整轮超时记录failed并停止共享guard，沿现有finally释放API/SDK资源。回调吞掉取消后返回时仍检查expired，不能继续下一阶段或宣告完成。
+
+这是协作式取消，不是操作系统强杀：阻塞事件循环的同步函数、永久吞掉取消的回调，以及卡住的资源关闭仍可能延迟返回。为保证清理，不将600秒描述为进程退出硬上限；超时也不会撤销此前已提交的数据。RunRecord的stage/status/elapsed_ms用于定位停在哪一步，不保存异常正文。
+
+离线回归覆盖prepare/seed/启动/exercise/audit挂起、吞掉取消返回、非法超时；真实SDK与FastAPI生命周期，存储和provider wire为替身。实际命令和最终结果见journal当天记录，不代表真实浏览器或模型验收。

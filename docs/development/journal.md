@@ -25,6 +25,15 @@
 - 起点main `3c66ca905983f2f9e398969057c166b9b3788647`与gh远端一致；补核其Backend41279389934、Frontend41279390023、Container41279389878均success（昨日证据，非今日重跑）。原8组未跟踪材料保留。父/根无AGENTS，本轮未改frontend；未核实其他聊天活跃状态，不宣称已核实无并行开发。只提交本次具体路径。
 - 可演示：无凭据运行上述测试，解释跨进程HTTP请求如何仍使用父进程同一guard及精确回执门禁。阶段未完成：真实Playwright/存储组合、公开样本参数化、来源使用条件、有效模型token费用清单及真实运行授权仍待；96次全流程与人民币硬上限未验收。下一步优先样本配置与实际浏览器无provider组合。提交SHA/普通推送结果在下方交接补充；新CI未预填通过。
 
+### 2026-11-03：整轮验收截止时间与超时清理
+
+- 延续ENG-05B/ENG-06，周二无例行调研，无新阶段/调用决策。起点main `8175d3a632499886019d7e917fe4e6f409ec4d60`，常规gh读取远端一致；其Backend/Frontend/Container均completed/success（昨日CI）。父/根及本次shared/tests路径无AGENTS；读README/plan/W45/ADR0001，未改frontend。未核实其他聊天活跃状态；原8组未跟踪材料保留。
+- 问题：浏览器局部超时不能约束prepare、启动或audit挂起。workflow新增有限正数timeout（默认600秒），同一个asyncio截止时间覆盖全轮，超时复用失败停止/资源清理；回调吞取消后返回也拒绝后续阶段和完成。非法超时在SDK/record副作用前拒绝。没有增加模型调用、改变数据或发布边界。
+- Windows Python3.12.7常规进程：`.venv/Scripts/python.exe scripts/run_backend_tests.py` **387 passed / 1 POSIX skipped / 3既有warnings，48.82s，退出0**；新增10场景覆盖prepare/seed/启动/exercise/audit挂起、吞取消返回、0/负数/inf/nan。真实SDK/FastAPI生命周期，存储和provider wire为替身；断言failed/stopped、资源退出、无后续底层请求。全仓`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`及git diff --check通过。
+- 首轮沙箱专项无统计中止退出1，不计通过；常规专项28 passed/6 failed，失败均为新增测试在SDK关闭后重试所期待的异常类型错误（实际APIConnectionError），修正后完整回归通过，仍断言无新增wire。沙箱SSH/gh访问受限，常规gh查询成功；未改网络或凭据。
+- 可演示：无凭据复现审计挂起后整轮失败、guard停止和资源关闭。协作式取消不能强杀阻塞事件循环/永久吞取消的回调，清理可能超出截止时间；超时不回滚此前提交。未跑真实浏览器/数据库/Milvus/模型/评论/费用/发布，未重跑前端/build/容器/wheel。
+- verification补充契约与限制，plan仅更新进度；README入口未变，无新daily/ADR/旧状态表维护。下一步仍为真实Playwright与隔离存储的无provider组合及样本预期参数化；来源条件/有效模型token费用清单和真实调用许可仍待，不需要重选阶段。完整SHA/推送结果以下方交接与Git/memory为准，本次新CI未预填通过。
+
 ## 2026-W44（10-26 至 11-01）
 
 ### 周一研究与本周方案（2026-10-26）

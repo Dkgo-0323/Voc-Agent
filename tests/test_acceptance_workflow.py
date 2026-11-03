@@ -415,3 +415,75 @@ async def test_real_seed_twice_borrows_embedder_without_new_client(monkeypatch):
     assert [row.id for row in records[0]] == [row.id for row in records[1]]
     assert session.merge.await_count == len(demo.DEMO_MENTIONS) * 4
     assert close.await_count == 2 and wire.closed
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("blocked", ["prepare", "seed", "startup", "exercise", "audit", "swallowed"])
+async def test_workflow_deadline_stops_run_and_closes_resources(monkeypatch, blocked):
+    close = storage(monkeypatch)
+    wire, record = Wire(), RunRecord(str(uuid4()))
+    entered, released = asyncio.Event(), asyncio.Event()
+    adapters_seen = []
+
+    async def block(*args):
+        entered.set()
+        try:
+            await asyncio.Event().wait()
+        except asyncio.CancelledError:
+            if blocked != "swallowed":
+                raise
+        finally:
+            released.set()
+
+    async def prepare(adapters):
+        adapters_seen.append(adapters)
+        if blocked in {"prepare", "swallowed"}:
+            await block()
+
+    async def seed(adapters):
+        if blocked == "seed":
+            await block()
+
+    async def exercise(app, run_id):
+        if blocked == "exercise":
+            await block()
+        return receipts(run_id)
+
+    async def audit(*args):
+        if blocked == "audit":
+            await block()
+
+    if blocked == "startup":
+        monkeypatch.setattr(main.AspectRepository, "validate_locked_skus", block)
+    task = asyncio.create_task(run_business_acceptance(
+        record, POLICY, api_key="offline", transport=wire,
+        prepare=prepare, seed=seed, exercise=exercise, audit=audit, timeout=1,
+    ))
+    await asyncio.wait_for(entered.wait(), 5)
+    with pytest.raises(TimeoutError):
+        await task
+    assert released.is_set() and wire.closed
+    assert record.status == "failed" and record.provider["stopped"]
+    assert record.stages[-1]["status"] == "failed"
+    assert close.await_count == (0 if blocked in {"prepare", "seed", "swallowed"} else 1)
+    attempts = len(wire.calls)
+    with pytest.raises(APIConnectionError):
+        await adapters_seen[0].chat.complete(messages=[], tools=[])
+    assert len(wire.calls) == attempts
+    if blocked == "swallowed":
+        assert [stage["name"] for stage in record.stages] == ["prepare"]
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("timeout", [0, -1, float("inf"), float("nan")])
+async def test_invalid_workflow_deadline_has_no_side_effects(timeout):
+    wire, record = Wire(), RunRecord(str(uuid4()))
+    callback = AsyncMock()
+    with pytest.raises(ValueError, match="finite positive"):
+        await run_business_acceptance(
+            record, POLICY, api_key="offline", transport=wire,
+            prepare=callback, seed=callback, exercise=callback, audit=callback,
+            timeout=timeout,
+        )
+    callback.assert_not_awaited()
+    assert record.status == "not_started" and not wire.calls and not wire.closed

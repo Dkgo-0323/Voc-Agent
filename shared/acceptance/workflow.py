@@ -6,6 +6,8 @@ adapters/app; legacy subprocess launchers are deliberately not called here.
 
 from __future__ import annotations
 
+import asyncio
+import math
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass, field
 from time import monotonic
@@ -48,6 +50,7 @@ async def run_business_acceptance(
     seed: Prepare,
     exercise: Exercise,
     audit: Audit,
+    timeout: float = 600,
 ) -> None:
     """Prepare, seed twice, start one API, exercise and audit under one guard.
 
@@ -55,8 +58,12 @@ async def run_business_acceptance(
     integration. Exercise receives an already-started app: it must not start its
     lifespan again or construct another API. Audit must raise on mismatch. This
     function does not authorize live use, implement a monetary cap, or roll back
-    writes from an earlier completed stage. No callback output is kept in record.
+    writes from an earlier completed stage. The timeout covers all stages,
+    including API startup; cancellation is cooperative and cleanup is awaited. No callback output is kept in record.
     """
+    if not math.isfinite(timeout) or timeout <= 0:
+        raise ValueError("Use a finite positive workflow timeout")
+    deadline = asyncio.timeout(timeout)
     if record.status != "not_started" or record.stages or record.provider is not None:
         raise ValueError("A run record cannot be reused")
     if policy.chat_requests > 72 or policy.embedding_requests > 24:
@@ -72,6 +79,8 @@ async def run_business_acceptance(
             if adapters.guard.summary()["stopped"]:
                 raise AcceptanceStopped("A previous acceptance stage stopped the run")
             value = await action()
+            if deadline.expired():
+                raise TimeoutError("Acceptance workflow deadline expired")
             # A callback may catch a provider failure; that must not advance us.
             if adapters.guard.summary()["stopped"]:
                 raise AcceptanceStopped("Acceptance stage returned after a failure")
@@ -86,7 +95,7 @@ async def run_business_acceptance(
             record.provider = adapters.guard.summary()
 
     try:
-        async with acceptance_adapters(
+        async with deadline, acceptance_adapters(
             policy, api_key=api_key, transport=transport,
         ) as adapters:
             try:
@@ -114,6 +123,8 @@ async def run_business_acceptance(
             except BaseException:
                 adapters.guard.stop()
                 raise
+        if deadline.expired():
+            raise TimeoutError("Acceptance workflow deadline expired")
     except BaseException:
         record.status = "failed"
         if adapters is not None:
