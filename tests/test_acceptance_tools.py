@@ -47,8 +47,8 @@ def fixture():
                                 executed=True,
                                 normalized_arguments={
                                     "week_range": {
-                                        "start_week_id": 202403,
-                                        "end_week_id": 202403,
+                                        "start_week_id": expected.week_id,
+                                        "end_week_id": expected.week_id,
                                     }
                                 },
                             )
@@ -223,3 +223,27 @@ async def test_verifier_queries_only_the_receipt_session_and_closes_database(
         == receipt["turns"][0]["session_id"]
     )
     assert lifecycle == ["init", "close"]
+
+
+@pytest.mark.parametrize("index", range(5))
+def test_every_turn_checks_its_requested_week(index):
+    receipt, messages, kwargs = fixture()
+    messages[index * 2 + 1].tool_calls["calls"][0]["normalized_arguments"] = {}
+    with pytest.raises(ValueError, match="expected week"):
+        audit_turns(receipt, messages, EXPECTATIONS, **kwargs)
+
+
+@pytest.mark.parametrize("tool", ["tool_sql", "tool_rag"])
+@pytest.mark.parametrize("mutation", ["wrong", "missing", "duplicate_wrong"])
+def test_mixed_turn_cannot_borrow_other_tools_correct_week(tool, mutation):
+    receipt, messages, kwargs = fixture()
+    calls = messages[7].tool_calls["calls"]
+    target = next(call for call in calls if call["tool_name"] == tool)
+    if mutation == "duplicate_wrong":
+        target = deepcopy(target)
+        calls.append(target)
+    target["normalized_arguments"] = {} if mutation == "missing" else {
+        "week_range": {"start_week_id": 202404, "end_week_id": 202404}
+    }
+    with pytest.raises(ValueError, match="expected week"):
+        audit_turns(receipt, messages, EXPECTATIONS, **kwargs)

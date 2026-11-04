@@ -36,6 +36,14 @@
 
 实现、测试与交接文档提交 `93801e9825762e76469ba122e3be8bb952f37824`，已普通推送origin/main，仅上述5个具体路径。此SHA回填另作收尾提交，自身SHA由Git/memory及最终回复交接。
 
+### 2026-11-04：逐工具周次审计，拦截混合问题假通过
+
+- 实际运行约18:50–18:59 Asia/Shanghai，未倒填14:00；周三无例行研究，延续ENG-05B/ENG-06，无新阶段决策。读memory/README/plan/W45/ADR与代码，父根及shared/tests路径无AGENTS，未改frontend。main起点a7c24bd5d5217737bfbb4edcdc8db9241dc0f13d与远端一致；昨日Backend41588128071、Frontend41588127954、Container41588127977全部success。未核实其他聊天活跃状态，8组未跟踪材料保留。
+- 场景：追问同周产品的数量与噪音证据，SQL查202403、RAG查202404时，原audit只要求任意调用正确就可能通过。现在所有必需工具的全部已执行调用均须匹配指定单周；重复调用中的错周也拒绝。合成五轮预期全部明确周次（前四202403、拒答轮202452），不改变生产查询或通用多周场景。
+- 新增11个回归，覆盖每轮缺周及SQL/RAG任一错周、缺周、重复错周。Windows Python3.12环境，`.venv/Scripts/python.exe scripts/run_backend_tests.py`：398 passed / 1 POSIX skipped / 3既有warnings，56.26s，退出0；全仓`.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops`通过，git diff --check通过。真实审计代码及完整离线后端测试；新增用例的持久化消息是内存替身，无真实DB/Milvus/浏览器/模型/公开评论/费用/发布，未重跑前端/build/容器/wheel。
+- 可演示：离线构造混合工具错周trace，审计明确失败。检查normalized_arguments证明记录参数正确，不能证明返回数据周次或语义正确。定位expected week错误先查该轮每条executed调用的week_range；若缺必需工具先查tool_name/executed，不靠回答文本推断调用成功。
+- 文档读写首轮遗漏UTF-8参数导致GBK解码错误，未写入；补显式UTF-8后成功。初始gh网络受限，常规授权只读查询成功。verification补契约，plan必要更新，README入口未变；无新daily/ADR/旧状态表。下一步继续实际Playwright与隔离存储无provider组合、样本参数化；来源条件/模型token费用/真实运行授权仍待，96次全流程及人民币硬上限未验收。提交SHA与推送状态由下方交接补齐。
+
 ## 2026-W44（10-26 至 11-01）
 
 ### 周一研究与本周方案（2026-10-26）

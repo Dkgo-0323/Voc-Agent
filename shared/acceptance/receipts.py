@@ -103,17 +103,21 @@ def audit_turns(
         ]
         if not expectation.tools <= {call.get("tool_name") for call in calls}:
             raise ValueError(f"Turn {index + 1}: required tools were not executed")
-        if expectation.week_id is not None and not any(
-            (call.get("normalized_arguments") or {}).get("week_range")
-            == {
+        if expectation.week_id is not None:
+            required_calls = [
+                call for call in calls if call.get("tool_name") in expectation.tools
+            ]
+            expected_range = {
                 "start_week_id": expectation.week_id,
                 "end_week_id": expectation.week_id,
             }
-            for call in calls
-        ):
-            raise ValueError(
-                f"Turn {index + 1}: expected week missing from executed tools"
-            )
+            if not required_calls or any(
+                (call.get("normalized_arguments") or {}).get("week_range")
+                != expected_range for call in required_calls
+            ):
+                raise ValueError(
+                    f"Turn {index + 1}: expected week missing from executed tools"
+                )
         ids = (assistant.cited_ids or {}).get("mention_ids", [])
         if not isinstance(ids, list):
             raise ValueError(f"Turn {index + 1}: invalid citation metadata")

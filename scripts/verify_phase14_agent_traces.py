@@ -29,7 +29,7 @@ EXPECTATIONS = tuple(
     TurnExpectation(
         prompt,
         frozenset(tools),
-        week_id=202403 if index == 3 else None,
+        week_id=202452 if index == 4 else 202403,
         status="abstained" if index == 4 else "success",
         require_citation=index in {1, 2, 3},
     )
