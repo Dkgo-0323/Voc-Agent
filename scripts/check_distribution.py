@@ -15,6 +15,7 @@ from pathlib import Path, PurePosixPath
 from zipfile import ZipFile
 
 REQUIRED_FILES = {
+    "shared/acceptance/synthetic-scenario.json",
     "backend/app/main.py",
     "backend/worker/main.py",
     "backend/app/db/seed.py",

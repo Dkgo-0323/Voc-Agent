@@ -1,10 +1,12 @@
 import { expect, test, type Page } from "@playwright/test";
 import path from "node:path";
+import { loadScenario } from "./scenario.mjs";
 import { browserConfiguration } from "./runtime.mjs";
 import { writeFile } from "node:fs/promises";
 import { askReceipt, reportReceipt, type AskReceipt } from "./receipt";
 
 const config = browserConfiguration(process.env);
+const scenario = loadScenario(process.env.PHASE14_SCENARIO_PATH);
 
 const password = process.env.PHASE14_ADMIN_PASSWORD;
 
@@ -40,7 +42,7 @@ test.describe.serial("Phase 14 release verification", () => {
 
     await page.goto("/skus/ecoflow-delta2");
     await expect(page.getByRole("heading", { name: "EcoFlow DELTA 2" })).toBeVisible();
-    await expect(page.getByText("fan is extremely loud").first()).toBeVisible();
+    await expect(page.getByText(scenario.citation_text).first()).toBeVisible();
 
     await page.goto("/compare");
     await expect(page.getByRole("heading", { name: "Compare SKUs" })).toBeVisible();
@@ -48,7 +50,7 @@ test.describe.serial("Phase 14 release verification", () => {
     await expect(page.getByLabel("SKU B")).toHaveValue("jackery-explorer-1000");
 
     const token = await page.evaluate(() => localStorage.getItem("voc.access-token"));
-    const invalid = await page.request.get(`${config.apiBaseUrl}/api/compare?sku_code=ecoflow-delta2&sku_code=anker-solix-f2000&week_id=202403`, {
+    const invalid = await page.request.get(`${config.apiBaseUrl}/api/compare?sku_code=ecoflow-delta2&sku_code=anker-solix-f2000&week_id=${scenario.report_week}`, {
       headers: { Authorization: `Bearer ${token}` },
     });
     expect(invalid.status()).toBe(400);
@@ -60,8 +62,8 @@ test.describe.serial("Phase 14 release verification", () => {
   test("report generation and regeneration persist a weekly report", async ({ page }, testInfo) => {
     await login(page);
     await page.goto("/reports");
-    await page.getByLabel("Report SKU").selectOption("ecoflow-delta2");
-    await page.getByLabel("Report week").selectOption("202403");
+    await page.getByLabel("Report SKU").selectOption(scenario.report_sku);
+    await page.getByLabel("Report week").selectOption(String(scenario.report_week));
     const generate = page.waitForResponse((response) =>
       new URL(response.url()).pathname === "/api/reports/generate" && response.request().method() === "POST");
     await page.getByRole("button", { name: /^(Generate|Regenerate) report$/ }).click();
@@ -75,8 +77,8 @@ test.describe.serial("Phase 14 release verification", () => {
     const regeneratedResponse = await regenerate;
     expect(regeneratedResponse.ok()).toBe(true);
     const second = reportReceipt(await regeneratedResponse.text());
-    expect(first.sku_code).toBe("ecoflow-delta2");
-    expect(first.week_id).toBe(202403);
+    expect(first.sku_code).toBe(scenario.report_sku);
+    expect(first.week_id).toBe(scenario.report_week);
     expect(second.report_id).toBe(first.report_id);
     expect(second.sku_code).toBe(first.sku_code);
     expect(second.week_id).toBe(first.week_id);
@@ -92,14 +94,14 @@ test.describe.serial("Phase 14 release verification", () => {
     const turns: AskReceipt[] = [];
     await login(page);
     await page.goto("/ask");
-    turns.push(await ask(page, "Use tool_sql to count reviews and mentions for jackery-explorer-1000 in ISO week 202403."));
-    turns.push(await ask(page, "What noise complaints do customers report about ecoflow-delta2 in ISO week 202403? Include an exact customer example."));
+    turns.push(await ask(page, scenario.turns[0].prompt));
+    turns.push(await ask(page, scenario.turns[1].prompt));
     await expect(page.getByRole("button", { name: "Open citation 1" }).last()).toBeVisible();
     await page.getByRole("button", { name: "Open citation 1" }).last().click();
-    await expect(page.getByRole("dialog", { name: "Citation 1" })).toContainText("fan is extremely loud");
-    turns.push(await ask(page, "Use tool_sql for the review count and tool_rag for an exact customer example about fan noise for ecoflow-delta2 in ISO week 202403."));
-    turns.push(await ask(page, "What about jackery-explorer-1000 for the same week? Use tool_sql for its review count and tool_rag for one exact customer example."));
-    turns.push(await ask(page, "Use tool_rag to check what evidence exists for ecoflow-delta2 in ISO week 202452."));
+    await expect(page.getByRole("dialog", { name: "Citation 1" })).toContainText(scenario.citation_text);
+    turns.push(await ask(page, scenario.turns[2].prompt));
+    turns.push(await ask(page, scenario.turns[3].prompt));
+    turns.push(await ask(page, scenario.turns[4].prompt));
     await expect(page.getByText("No matching VOC data was found for this request.")).toBeVisible();
     expect(new Set(turns.map((turn) => turn.session_id)).size).toBe(1);
     const receiptPath = process.env.PHASE14_RECEIPT_DIR ? path.join(process.env.PHASE14_RECEIPT_DIR, "ask-receipt.json") : testInfo.outputPath("ask-receipt.json");

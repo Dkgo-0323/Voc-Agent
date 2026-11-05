@@ -46,6 +46,15 @@
 
 实现及验收提交 `21a8edcbeec4029e1615b236dd0e237abf027919` 已普通推送main。SSH首推publickey认证失败，使用现有gh凭据助手经HTTPS成功（未改远端配置/凭据）。本次新CI尚未核实成功；此交接补充另作文档提交，自身SHA由memory/最终回复提供。
 
+### 2026-11-05：浏览器与审计共享场景预期
+
+- 目标/原因：旧浏览器和Python审计各自写死五轮问题/202403，换样本容易仍问旧问题。新增共享synthetic-scenario.json及Python/Node加载校验；浏览器可通过绝对PHASE14_SCENARIO_PATH替换问题、报告SKU/周和引用文本；Python load_scenario/turn_expectations供database_audit显式复用。旧CLI默认合成场景与mention白名单不变。新增wheel资源存在检查，未改生产API/模型策略。
+- 基线：main 5154d817f889c85cfa9ebf641a9564d49f38fd43与gh远端一致；父根无AGENTS，遵守frontend AGENTS并阅读本地Next文档。可见聊天列表无其他同仓库活跃开发，原8组材料保留。昨日最终Backend41817576942/Frontend41817576998/Container41817576798全部success；周四无例行调研，阶段ENG-05B/ENG-06不变。
+- Windows现有Python3.12/Node22环境，完整`.venv/Scripts/python.exe scripts/run_backend_tests.py`：410 passed /1 POSIX skipped /3既有warnings，63.32s；全仓Ruff通过。`npm run typecheck`通过；`npm test -- --maxWorkers=2`最终10文件56测试通过/18.01s。全仓`npm run lint`常规环境退出0（沙箱无输出中断退出1，不计通过）。三份核心文档本地链接检查与git diff/暂存检查通过。新增12后端场景覆盖换周/问题、非法ISO周、工具和矛盾引用约束；前端验证默认及临时配置替换/拒绝。首次前端55过1失败为jsdom将import.meta.url转换为非file URL，测试明确Node环境后完整通过。
+- `uv build --wheel --out-dir artifacts/runtime/scenario-wheel`首次沙箱缓存拒绝访问退出1；常规环境成功，zip实查包含共享JSON。未重做安装后导入烟测。新增测试仅内存/本地临时JSON；无真实浏览器、DB/Milvus、模型、公开评论、付费/凭据或发布，未跑Next build/容器。配置校验不证明问题语义匹配样本；五轮UI结构及固定SKU导航仍保留，通用数据集E2E未完成。
+- 可演示：修改配置的首轮prompt/week为202601，Python审计预期与Node读取均使用新值；202153等非法周在请求前拒绝。排查错周先核对浏览器路径和Python显式load路径是否一致，再看持久化trace；引用弹窗失败先查citation_text是否来自本次准备的样本，不能自动放宽断言。
+- verification维护新入口/边界，plan必要更新；README运行入口未变，无新daily/ADR/旧三表。下一步继续实际Playwright+隔离存储无provider组合，固定SKU页面参数与场景语义对齐；真实来源条件/模型token费用清单/运行许可仍待，96次全流程及人民币硬上限未验收。无新阶段决策需要用户回答。完整实现SHA/推送由下方交接补齐。
+
 ## 2026-W44（10-26 至 11-01）
 
 ### 周一研究与本周方案（2026-10-26）

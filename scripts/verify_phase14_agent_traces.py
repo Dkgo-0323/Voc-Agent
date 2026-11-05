@@ -15,38 +15,11 @@ from pathlib import Path
 if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).absolute().parents[1]))
 
-from shared.acceptance.receipts import TurnExpectation, audit_turns, validate_receipt
+from shared.acceptance.receipts import audit_turns, validate_receipt
+from shared.acceptance.scenario import load_scenario, turn_expectations
 
-PROMPTS = (
-    "Use tool_sql to count reviews and mentions for jackery-explorer-1000 in ISO week 202403.",
-    "What noise complaints do customers report about ecoflow-delta2 in ISO week 202403? Include an exact customer example.",
-    "Use tool_sql for the review count and tool_rag for an exact customer example about fan noise for ecoflow-delta2 in ISO week 202403.",
-    "What about jackery-explorer-1000 for the same week? Use tool_sql for its review count and tool_rag for one exact customer example.",
-    "Use tool_rag to check what evidence exists for ecoflow-delta2 in ISO week 202452.",
-)
-
-EXPECTATIONS = tuple(
-    TurnExpectation(
-        prompt,
-        frozenset(tools),
-        week_id=202452 if index == 4 else 202403,
-        status="abstained" if index == 4 else "success",
-        require_citation=index in {1, 2, 3},
-    )
-    for index, (prompt, tools) in enumerate(
-        zip(
-            PROMPTS,
-            (
-                {"tool_sql"},
-                {"tool_rag"},
-                {"tool_sql", "tool_rag"},
-                {"tool_sql", "tool_rag"},
-                {"tool_rag"},
-            ),
-            strict=True,
-        )
-    )
-)
+EXPECTATIONS = turn_expectations(load_scenario())
+PROMPTS = tuple(turn.prompt for turn in EXPECTATIONS)
 
 
 async def verify_agent_traces(receipt: dict, *, run_id: str) -> dict:

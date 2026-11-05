@@ -238,3 +238,11 @@ Ask与报告回执先检查run ID和结构；按session ID读取整个会话并�
 `audit_turns`在TurnExpectation指定week_id时，要求所有已执行且属于必需工具集合的调用都带有完全相同的单周week_range。混合问题中SQL与RAG不能借用对方的正确参数；同一工具重复调用也不能以一条正确调用掩盖另一条错误调用。未执行的调用不作为证据，必需工具缺失仍由既有校验拒绝。此约束只适用于指定了week_id的预期，不改变通用多周业务查询。
 
 合成五轮EXPECTATIONS现在全部显式指定周次：前四轮202403，最后无数据轮202452。新增回归覆盖每轮缺周、混合问题任一工具错周/缺周/重复调用错周。审计验证持久化trace参数，不证明数据库返回数据确实属于该周，也不评判回答语义；实际测试结果见journal。
+
+### 2026-11-05：共享数据集场景
+
+默认合成预期位于`shared/acceptance/synthetic-scenario.json`。`load_scenario(path)`校验schema、五轮问题、必需工具、合法ISO周、状态与引用要求；`turn_expectations`生成可传给`database_audit`的预期。旧合成trace CLI仍固定使用默认场景与合成mention白名单，不可用于公开数据验收。
+
+浏览器用例默认读取同一文件；可显式设置`PHASE14_SCENARIO_PATH`为绝对JSON路径，替换五轮prompt、报告SKU/周和引用文本。Python运行器须显式加载同一个文件并提供该数据集的mention白名单，不会自动根据浏览器环境选择审计场景。配置不是数据准备工具，也不授予真实调用许可；原live opt-in和隔离目标检查保留。
+
+当前浏览器语义仍是SQL→RAG→混合→追问→拒答，引用弹窗在第二轮检查，导航和对比仍为固定SKU。仅兼容此结构的数据集可复用；修改status/tools并不会自动改变UI断言。公开样本准备、实际浏览器/隔离存储联调仍待完成，不将配置回归称为真实E2E。JSON是wheel必需资源，distribution检查新增资源存在性要求。
