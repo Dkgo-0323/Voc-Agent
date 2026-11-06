@@ -2,6 +2,7 @@
 
 from collections.abc import Callable, Sequence
 from contextlib import AbstractAsyncContextManager
+from datetime import date
 from uuid import UUID
 
 from sqlalchemy import select
@@ -23,6 +24,8 @@ def database_audit(
     *,
     expectations: Sequence[TurnExpectation],
     allowed_mention_ids: set[str],
+    report_sku: str,
+    report_week: int,
 ):
     """Build a workflow audit callback, without initializing/disposing the DB.
 
@@ -32,6 +35,11 @@ def database_audit(
     callback issues reads only; the context owns transaction/session cleanup.
     No message body or report content is returned or retained in a run record.
     """
+    if not isinstance(report_sku, str) or not report_sku.strip():
+        raise ValueError("Invalid expected report SKU")
+    if type(report_week) is not int:
+        raise ValueError("Invalid expected report ISO week")
+    date.fromisocalendar(report_week // 100, report_week % 100, 1)
     expected = tuple(expectations)
     allowed = {uuid_text(value) for value in allowed_mention_ids}
     if len(expected) != 5:
@@ -40,6 +48,8 @@ def database_audit(
     async def audit(ask: dict, reports: dict, run_id: str) -> None:
         turns = validate_receipt(ask, run_id=run_id)
         last = validate_report_receipt(reports, run_id=run_id)[-1]
+        if last["sku_code"] != report_sku or last["week_id"] != report_week:
+            raise ValueError("Report receipt differs from the planned SKU/week")
         if len(turns) != len(expected):
             raise ValueError("Receipt does not match the expected turn count")
         async with session_context() as session:

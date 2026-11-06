@@ -57,6 +57,16 @@
 
 交付交接：实现完整SHA `b672d24be397376890455104fa2366bfa0cccd04`。两次普通HTTPS推送分别连接重置、443连接超时，尚未推送；首次失败后gh核对远端仍为5154d817f889c85cfa9ebf641a9564d49f38fd43。代码已本地提交，未改remote/凭据/网络配置、无强推，新CI未运行核验。此证据另作本地收尾提交，下一轮先核对远端再补普通推送。
 
+
+### 2026-11-06：报告回执绑定计划SKU与周次
+
+- 原因：旧database_audit只核对回执与当前存储一致，若浏览器生成错误SKU/周次的报告，两者自洽仍可通过。现在构造回调必须显式给report_sku/report_week，并校验非空SKU与合法ISO周；回执与计划不符时，在进入会话/查询之前拒绝。预期应从同一场景文件读取，不能从回执反填。普通API/报告生成逻辑不变，未引入新架构或数据选择。
+- 起点main c83cd4d6ac766792d821c7c766fe6dc760b95252；远端只读核实仍5154d817f889c85cfa9ebf641a9564d49f38fd43，随后通过现有gh HTTPS凭据助手普通补推b672d24be397376890455104fa2366bfa0cccd04与c83cd4d，无配置修改/强推。适用父根/shared/tests未见AGENTS；已读取README/plan/W45/ADR0001，未改frontend。可见聊天列表未发现同仓库其他活跃开发（列表范围有限），8组用户未跟踪材料原位保留。周五不重复例行调研，延续ENG-05B/ENG-06。
+- Windows既有Python3.12环境，常规授权进程执行 `.venv/Scripts/python.exe scripts/run_backend_tests.py`：**418 passed / 1 POSIX skipped / 3既有warnings，47.66s，退出0**。全仓 `.venv/Scripts/python.exe -m ruff check backend pipelines shared scripts tests conftest.py ops` 与git diff --check通过。新增8个场景：错SKU/错周即使回执与模拟存储一致仍拒绝，整轮failed/stopped、关闭DB和SDK且无审计查询；6个非法预期范围在构造时拒绝。既有正常/旧报告/引用/查询失败路径继续通过。
+- 验证边界：真实SDK/FastAPI生命周期，模型wire/会话/报告仓库为替身。没有运行真实Playwright、DB/Milvus、模型、公开评论、费用或发布；未重跑前端/build/wheel/容器，不称真实业务效果或96次全流程/人民币上限已验收。没有补核新CI成功。
+- 可演示：运行上述回归，模拟计划DELTA2/202403、回执及存储却是Explorer1000/202404，观察在数据库会话前失败。范围不符先核对加载场景与传入report_sku/report_week；若范围正确但存储审计失败，查report_id/时间/内容摘要是否被其他运行替换，不能从回执回填预期绕过。
+- verification更新必需参数和同一场景接线方式，plan更新进度；README入口未变不改，无新daily/ADR/旧三表。下一步继续真实浏览器与隔离存储无provider组合；来源使用条件/有效模型token费用清单/真实运行授权仍待，无需重新选择阶段。实现提交SHA及推送状态在下方交接或memory/最终回复记录，不预填。
+
 ## 2026-W44（10-26 至 11-01）
 
 ### 周一研究与本周方案（2026-10-26）

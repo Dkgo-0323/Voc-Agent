@@ -200,7 +200,7 @@ Windows Python3.12.7常规进程执行`.venv/Scripts/python.exe scripts/run_back
 
 ### 2026-10-30：借用应用会话的数据库审计回调
 
-`shared/acceptance/audit.py` 的 `database_audit(get_db_context, expectations=..., allowed_mention_ids=...)` 返回可直接传给 `run_business_acceptance(audit=...)` 的回调。必须传入当前数据集的五轮预期与允许引用ID，不隐式使用202403合成样本。调用者应使用已启动应用的会话上下文；回调不调用init_db/close_db，也不创建模型客户端。这里只执行SELECT，事务与连接由传入上下文管理；并非数据库权限级只读沙箱。
+`shared/acceptance/audit.py` 的 `database_audit(get_db_context, expectations=..., allowed_mention_ids=..., report_sku=..., report_week=...)` 返回可直接传给 `run_business_acceptance(audit=...)` 的回调。必须传入当前数据集的五轮预期、允许引用ID和计划报告SKU/周次，不隐式使用202403合成样本。调用者应使用已启动应用的会话上下文；回调不调用init_db/close_db，也不创建模型客户端。这里只执行SELECT，事务与连接由传入上下文管理；并非数据库权限级只读沙箱。
 
 Ask与报告回执先检查run ID和结构；按session ID读取整个会话并按created_at/id排序，复用audit_turns核对消息数量、身份、prompt、工具、状态和引用范围，然后按SKU/周查询当前报告，复用audit_report核对报告ID、最终时间与内容SHA256。多余会话消息也会失败，不能只查询回执列出的消息来规避；摘要校验不判断语义质量。失败由workflow锁定共享guard并关闭外层资源，不撤销已提交数据。不记录正文/JWT。
 
@@ -246,3 +246,5 @@ Ask与报告回执先检查run ID和结构；按session ID读取整个会话并�
 浏览器用例默认读取同一文件；可显式设置`PHASE14_SCENARIO_PATH`为绝对JSON路径，替换五轮prompt、报告SKU/周和引用文本。Python运行器须显式加载同一个文件并提供该数据集的mention白名单，不会自动根据浏览器环境选择审计场景。配置不是数据准备工具，也不授予真实调用许可；原live opt-in和隔离目标检查保留。
 
 当前浏览器语义仍是SQL→RAG→混合→追问→拒答，引用弹窗在第二轮检查，导航和对比仍为固定SKU。仅兼容此结构的数据集可复用；修改status/tools并不会自动改变UI断言。公开样本准备、实际浏览器/隔离存储联调仍待完成，不将配置回归称为真实E2E。JSON是wheel必需资源，distribution检查新增资源存在性要求。
+
+报告范围必须来自调用前加载的同一场景，例如 `report_sku=scenario["report_sku"], report_week=scenario["report_week"]`，不能从浏览器回执反填。`database_audit`在打开数据库会话前比较回执与计划；即使另一SKU/周次的回执和存储完全一致也拒绝。此检查只验证任务范围，不判断报告内容的事实或语义质量。
