@@ -26,3 +26,8 @@ playwright-report/
 # Data directories
 data/
 *.jsonl
+
+# Local model responses, review bodies, process logs and generated exports
+artifacts/runtime/
+artifacts/e2e/
+output/
