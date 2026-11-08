@@ -26,6 +26,7 @@ from backend.app.api.auth import router as auth_router
 from backend.app.api.dashboard import router as dashboard_router
 from backend.app.api.reports import router as reports_router
 from backend.app.core.database import close_db, get_db_context, get_engine, init_db
+from backend.app.core.model_resources import ModelResourcePool, _resolve_llm_api_key
 from backend.app.core.settings import settings
 from backend.app.db.repositories.aspect_repo import AspectRepository
 from pipelines.config.targets import LOCKED_SKU_CODES
@@ -70,16 +71,28 @@ async def lifespan(app: FastAPI):
         raise
     logger.info(
         "Embedding 维度契约验证通过 [model=%s, dimensions=%d]",
-        adapters.guard.policy.embedding_model if adapters is not None else settings.embedding_model,
+        adapters.guard.policy.embedding_model
+        if adapters is not None
+        else settings.embedding_model,
         1024 if adapters is not None else settings.embedding_dimensions,
     )
-    logger.info("✅ 所有基础设施初始化完成")
+    pool = ModelResourcePool()
+    app.state.model_resource_pool = pool
 
     try:
+        if adapters is None and _resolve_llm_api_key():
+            # Warm configured clients before readiness, not on the first user's
+            # question. This opens clients only; it makes no chat requests.
+            await pool.get()
+        logger.info("✅ 所有基础设施初始化完成")
         yield
     finally:
         logger.info("🔻 VOC Agent 正在关闭...")
-        await close_db()
+        try:
+            await pool.aclose()
+        finally:
+            app.state.model_resource_pool = None
+            await close_db()
         logger.info("👋 关闭完成")
 
 
@@ -149,7 +162,9 @@ def create_app(*, acceptance_adapters: "AcceptanceAdapters | None" = None) -> Fa
         # ``*``. Keep development convenient while echoing only a local origin.
         allow_origins=[] if settings.is_development else ["https://your-domain.com"],
         allow_origin_regex=(
-            r"https?://(localhost|127\.0\.0\.1)(:\d+)?" if settings.is_development else None
+            r"https?://(localhost|127\.0\.0\.1)(:\d+)?"
+            if settings.is_development
+            else None
         ),
         allow_credentials=True,
         allow_methods=["*"],
@@ -163,8 +178,11 @@ def create_app(*, acceptance_adapters: "AcceptanceAdapters | None" = None) -> Fa
     if acceptance_adapters is not None:
         app.state.acceptance_adapters = acceptance_adapters
     app.add_api_route(
-        "/health", health_check, tags=["Infrastructure"],
-        summary="健康检查", response_model=dict[str, Any],
+        "/health",
+        health_check,
+        tags=["Infrastructure"],
+        summary="健康检查",
+        response_model=dict[str, Any],
     )
     return app
 

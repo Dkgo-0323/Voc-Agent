@@ -8,6 +8,11 @@ from time import perf_counter
 from typing import Any, Protocol
 from uuid import UUID
 
+from backend.app.agent.evidence_integrity import (
+    complete_context,
+    sentiment_label_conflict,
+    source_model_conflict,
+)
 from backend.app.agent.schemas import (
     AnswerCitation,
     ExpandedSourceMetadata,
@@ -41,7 +46,9 @@ class QueryEmbedderProtocol(Protocol):
 
 
 class MilvusSearchProtocol(Protocol):
-    def search(self, query_vector: list[float], **kwargs: Any) -> list[SearchResult]: ...
+    def search(
+        self, query_vector: list[float], **kwargs: Any
+    ) -> list[SearchResult]: ...
 
 
 def _is_valid_iso_week(week_id: int) -> bool:
@@ -75,14 +82,19 @@ class RagRetrievalService:
 
     async def execute(self, arguments: RagToolArguments) -> RagToolResult:
         started = perf_counter()
-        normalized_args = arguments.model_copy(update={"query": arguments.query.strip()})
+        normalized_args = arguments.model_copy(
+            update={"query": arguments.query.strip()}
+        )
         if normalized_args.top_k > self._max_top_k:
             return self._error(
                 normalized_args,
                 started,
                 code="top_k_exceeds_limit",
                 message=f"top_k must not exceed {self._max_top_k}.",
-                details={"requested": normalized_args.top_k, "maximum": self._max_top_k},
+                details={
+                    "requested": normalized_args.top_k,
+                    "maximum": self._max_top_k,
+                },
             )
         if (
             normalized_args.aspect_label is not None
@@ -242,8 +254,24 @@ class RagRetrievalService:
                 warnings.append(self._provenance_warning("filter_mismatch", hit.id))
                 continue
             if row.mention_text not in row.review_text:
-                warnings.append(self._provenance_warning("invalid_exact_evidence", hit.id))
+                warnings.append(
+                    self._provenance_warning("invalid_exact_evidence", hit.id)
+                )
                 continue
+            if source_model_conflict(row.sku_code, row.review_text):
+                warnings.append(
+                    self._provenance_warning("source_model_conflict", hit.id)
+                )
+                continue
+            if sentiment_label_conflict(row.sentiment, row.mention_text):
+                warnings.append(
+                    self._provenance_warning("source_sentiment_conflict", hit.id)
+                )
+                if (
+                    normalized_args.sentiment is not None
+                    and normalized_args.sentiment.value == "positive"
+                ):
+                    continue
             evidence.append(self._to_evidence(hit, row))
 
         if not evidence:
@@ -266,9 +294,7 @@ class RagRetrievalService:
             payload=payload,
         )
 
-    def _metadata_matches(
-        self, hit: SearchResult, row: RetrievedEvidenceRow
-    ) -> bool:
+    def _metadata_matches(self, hit: SearchResult, row: RetrievedEvidenceRow) -> bool:
         metadata = hit.metadata
         quality = metadata.get("quality_score")
         return (
@@ -304,9 +330,7 @@ class RagRetrievalService:
         )
 
     @staticmethod
-    def _to_evidence(
-        hit: SearchResult, row: RetrievedEvidenceRow
-    ) -> RetrievedEvidence:
+    def _to_evidence(hit: SearchResult, row: RetrievedEvidenceRow) -> RetrievedEvidence:
         source = ExpandedSourceMetadata(
             document_id=row.document_id,
             sku_code=row.sku_code,
@@ -325,7 +349,7 @@ class RagRetrievalService:
             sentiment=row.sentiment,
             week_id=row.week_id,
             mention_text=row.mention_text,
-            context_window=row.context_window,
+            context_window=complete_context(row.review_text, row.mention_text),
             quality_score=row.quality_score,
             similarity_score=hit.score,
             source=source,

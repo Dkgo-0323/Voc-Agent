@@ -7,6 +7,7 @@ import json
 import logging
 from collections.abc import AsyncGenerator, AsyncIterator
 from contextlib import suppress
+from dataclasses import replace
 from typing import Annotated, Protocol
 from uuid import UUID
 
@@ -16,9 +17,10 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.app.agent.conversation import ConversationService, UnknownSessionError
+from backend.app.agent.reliable import ReliableVocRouter
 from backend.app.agent.router import (
     VOC_SYSTEM_POLICY,
-    FunctionCallingRouter,
+    ToolBinding,
     build_tool_bindings,
 )
 from backend.app.agent.schemas import (
@@ -29,6 +31,7 @@ from backend.app.agent.schemas import (
     ErrorEvent,
     StreamingEvent,
     ToolError,
+    ToolStatus,
 )
 from backend.app.agent.tool_rag import RagRetrievalService
 from backend.app.agent.tool_report import ReportService
@@ -55,6 +58,19 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/api", tags=["Agent"])
 
 ANSWER_CHUNK_SIZE = 240
+
+
+def isolated_tool(binding: ToolBinding, db: AsyncSession) -> ToolBinding:
+    """A failed read must not poison the transaction that persists the chat."""
+
+    async def execute(arguments):
+        async with db.begin_nested() as savepoint:
+            result = await binding.executor(arguments)
+            if result.status is ToolStatus.ERROR:
+                await savepoint.rollback()
+            return result
+
+    return replace(binding, executor=execute)
 
 
 class AskRequest(BaseModel):
@@ -86,13 +102,16 @@ async def get_conversation_service(
             resources.embedder,
             MilvusRepository(),
         )
-        agent_router = FunctionCallingRouter(
+        agent_router = ReliableVocRouter(
             resources.chat,
-            build_tool_bindings(
-                report_service=report_service,
-                analytics_service=analytics_service,
-                rag_service=rag_service,
-            ),
+            [
+                isolated_tool(binding, db)
+                for binding in build_tool_bindings(
+                    report_service=report_service,
+                    analytics_service=analytics_service,
+                    rag_service=rag_service,
+                )
+            ],
             system_policy=VOC_SYSTEM_POLICY,
         )
         yield ConversationService(ConversationRepository(db), agent_router)

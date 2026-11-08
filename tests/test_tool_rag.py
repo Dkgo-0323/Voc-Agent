@@ -152,7 +152,9 @@ async def test_delta2_noise_returns_exact_traceable_evidence() -> None:
     service, _, embedder, _ = service_for([(hit, row)])
 
     result = await service.execute(
-        RagToolArguments(query="How do users describe the noise?", sku_codes=[row.sku_code])
+        RagToolArguments(
+            query="How do users describe the noise?", sku_codes=[row.sku_code]
+        )
     )
 
     assert result.status is ToolStatus.SUCCESS
@@ -165,7 +167,24 @@ async def test_delta2_noise_returns_exact_traceable_evidence() -> None:
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("hydrated", [True, False], ids=["verified-evidence", "unhydrated-hit"])
+async def test_conflicting_source_model_is_not_used_as_delta2_evidence():
+    hit, row = evidence_pair()
+    row = row.model_copy(
+        update={"review_text": "I used the Delta Max 2; fan is extremely loud."}
+    )
+    service, _, _, _ = service_for([(hit, row)])
+    result = await service.execute(
+        RagToolArguments(query="noise", sku_codes=["ecoflow-delta2"])
+    )
+    assert result.status is ToolStatus.EMPTY
+    assert result.payload is None
+    assert any(w.code == "source_model_conflict" for w in result.warnings)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "hydrated", [True, False], ids=["verified-evidence", "unhydrated-hit"]
+)
 async def test_report_evidence_provenance_requires_relational_hydration(hydrated):
     """A vector UUID alone is never a customer citation, including report inputs."""
     hit, row = evidence_pair(
@@ -457,9 +476,7 @@ async def test_source_document_hydration_retains_expandable_review_detail() -> N
 @pytest.mark.asyncio
 async def test_quality_threshold_is_enforced_in_milvus_and_hydration() -> None:
     pair = evidence_pair(quality_score=0.77)
-    service, repository, _, milvus = service_for(
-        [pair], quality_threshold=0.77
-    )
+    service, repository, _, milvus = service_for([pair], quality_threshold=0.77)
     result = await service.execute(
         RagToolArguments(query="noise", sku_codes=["ecoflow-delta2"])
     )
@@ -494,9 +511,7 @@ async def test_final_citations_can_select_three_of_eight_retrieved_items() -> No
     )
 
     assert result.payload is not None
-    selected_ids = [
-        result.payload.evidence[index].mention_id for index in (0, 3, 7)
-    ]
+    selected_ids = [result.payload.evidence[index].mention_id for index in (0, 3, 7)]
     citations = build_answer_citations(result.payload.evidence, selected_ids)
     assert [citation.mention_id for citation in citations] == selected_ids
     assert len(citations) == 3
@@ -525,4 +540,6 @@ async def test_hydration_query_rechecks_quality_dashboard_and_source_join() -> N
     assert "aspect_mentions.quality_score >=" in sql
     assert "skus.dashboard_enabled IS true" in sql
     assert "documents" in sql
-    assert settings.aspect_quality_threshold in session.statement.compile().params.values()
+    assert (
+        settings.aspect_quality_threshold in session.statement.compile().params.values()
+    )

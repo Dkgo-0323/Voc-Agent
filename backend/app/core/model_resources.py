@@ -1,7 +1,8 @@
-"""Model resources: production request ownership or explicit acceptance run ownership."""
+"""Application-owned production clients or explicit acceptance run ownership."""
 
+import asyncio
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import AsyncExitStack, asynccontextmanager
 from dataclasses import dataclass
 
 from fastapi import FastAPI, Request
@@ -16,6 +17,31 @@ from pipelines.embedding.embedder import Embedder
 class ModelResources:
     chat: OpenAIChatCompletionsModel
     embedder: Embedder
+
+
+class ModelResourcePool:
+    """Lazily open clients once per application and close on lifespan shutdown."""
+
+    def __init__(self):
+        self._lock = asyncio.Lock()
+        self._stack = AsyncExitStack()
+        self._resources = None
+        self._closed = False
+
+    async def get(self):
+        async with self._lock:
+            if self._closed:
+                raise RuntimeError("Model resources have been closed")
+            if self._resources is None:
+                self._resources = await self._stack.enter_async_context(
+                    _fresh_model_resources()
+                )
+            return self._resources
+
+    async def aclose(self):
+        async with self._lock:
+            self._closed = True
+            await self._stack.aclose()
 
 
 def stop_acceptance_run(request: Request) -> None:
@@ -54,21 +80,42 @@ async def model_resources(app: FastAPI) -> AsyncIterator[ModelResources]:
     if adapters is not None:
         yield ModelResources(adapters.chat, adapters.embedder)
         return  # The outer run, not a request, owns and closes these resources.
+    pool = getattr(app.state, "model_resource_pool", None)
+    if pool is not None:
+        yield await pool.get()
+        return
+    # Small isolated callers without application lifespan retain scoped ownership.
+    async with _fresh_model_resources() as resources:
+        yield resources
+
+
+@asynccontextmanager
+async def _fresh_model_resources() -> AsyncIterator[ModelResources]:
     llm_key = _resolve_llm_api_key()
     if not llm_key:
-        raise RuntimeError("LLM_API_KEY is not configured and no same-provider key can be reused")
-    async with AsyncOpenAI(
-        api_key=llm_key, base_url=settings.llm_base_url,
-        timeout=settings.llm_timeout_seconds, max_retries=settings.llm_max_retries,
-    ) as llm_client, AsyncOpenAI(
-        api_key=settings.embedding_api_key or settings.openai_api_key,
-        base_url=settings.embedding_base_url,
-        timeout=settings.llm_timeout_seconds, max_retries=settings.llm_max_retries,
-    ) as embedding_client:
+        raise RuntimeError(
+            "LLM_API_KEY is not configured and no same-provider key can be reused"
+        )
+    async with (
+        AsyncOpenAI(
+            api_key=llm_key,
+            base_url=settings.llm_base_url,
+            timeout=settings.llm_timeout_seconds,
+            max_retries=settings.llm_max_retries,
+        ) as llm_client,
+        AsyncOpenAI(
+            api_key=settings.embedding_api_key or settings.openai_api_key,
+            base_url=settings.embedding_base_url,
+            timeout=settings.llm_timeout_seconds,
+            max_retries=settings.llm_max_retries,
+        ) as embedding_client,
+    ):
         yield ModelResources(
             OpenAIChatCompletionsModel(
-                llm_client, model=settings.llm_model,
-                max_tokens=settings.llm_max_tokens, extra_body=settings.llm_extra_body,
+                llm_client,
+                model=settings.llm_model,
+                max_tokens=settings.llm_max_tokens,
+                extra_body=settings.llm_extra_body,
                 final_response_format=(
                     {"type": "json_object"} if _uses_zhipu_json_mode() else None
                 ),
