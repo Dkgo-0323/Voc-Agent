@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { AskWorkspace } from "@/components/ask/ask-workspace";
 
@@ -65,7 +65,7 @@ describe("AskWorkspace", () => {
       onEvent({ event_type: "done", session_id: "session-1", status: "abstained" });
     });
     ask("What about next week?");
-    expect(await screen.findAllByText("No matching VOC data was found for this request.")).toHaveLength(1);
+    expect(await screen.findAllByText("本次尚未形成完整结论，请参照下方说明继续。")).toHaveLength(1);
     expect(askApi.streamAsk).toHaveBeenLastCalledWith("What about next week?", expect.any(Function), expect.objectContaining({ sessionId: "session-1" }));
   });
 
@@ -107,5 +107,52 @@ describe("AskWorkspace", () => {
     ask("Can this complete with an error?");
 
     expect(await screen.findByText("The response could not be completed. Please try again.")).toBeInTheDocument();
+  });
+
+  it("keeps partial results visible and retries the original question", async () => {
+    askApi.streamAsk.mockImplementationOnce(async (_message: string, onEvent: (event: unknown) => void) => {
+      onEvent({ event_type: "answer_delta", delta: "统计已完成，检索暂时不可用。" });
+      onEvent({ event_type: "done", session_id: "session-1", status: "partial" });
+    }).mockImplementationOnce(async (_message: string, onEvent: (event: unknown) => void) => {
+      onEvent({ event_type: "answer_delta", delta: "完整结果。" });
+      onEvent({ event_type: "done", session_id: "session-1", status: "success" });
+    });
+    render(<AskWorkspace />);
+    ask("Delta 2有多少评论，续航如何？");
+    expect(await screen.findByText("部分查询未完成，下方保留已有依据的结果。")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "重试此问题" }));
+    await screen.findByText("完整结果。");
+    expect(askApi.streamAsk).toHaveBeenLastCalledWith("Delta 2有多少评论，续航如何？", expect.any(Function), expect.objectContaining({ sessionId: "session-1" }));
+  });
+
+  it("does not expose internal grounding errors", async () => {
+    askApi.streamAsk.mockImplementation(async (_message: string, onEvent: (event: unknown) => void) => {
+      onEvent({ event_type: "error", error: { code: "agent_request_failed", message: "No successful tool result supports a VOC answer.", retryable: true } });
+    });
+    render(<AskWorkspace />);
+    ask("Delta 2怎么样？");
+    await screen.findByRole("alert");
+    expect(screen.queryByText("No successful tool result supports a VOC answer.")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "重试此问题" })).toBeEnabled();
+  });
+
+  it("ignores old stream events after starting a new conversation", async () => {
+    let emitOld: (event: unknown) => void = () => {};
+    let finishOld: () => void = () => {};
+    let emitNew: (event: unknown) => void = () => {};
+    let finishNew: () => void = () => {};
+    askApi.streamAsk.mockImplementationOnce((_message: string, onEvent: (event: unknown) => void) => { emitOld = onEvent; return new Promise<void>((resolve) => { finishOld = resolve; }); })
+      .mockImplementationOnce((_message: string, onEvent: (event: unknown) => void) => { emitNew = onEvent; return new Promise<void>((resolve) => { finishNew = resolve; }); });
+    render(<AskWorkspace />);
+    ask("Old question");
+    fireEvent.click(screen.getByRole("button", { name: "New conversation" }));
+    ask("New question");
+    await act(async () => { emitOld({ event_type: "done", session_id: "old-session", status: "success" }); finishOld(); });
+    expect(screen.getByRole("button", { name: "Stop" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Ask a question")).toBeDisabled();
+    await act(async () => { emitNew({ event_type: "answer_delta", delta: "New answer" }); emitNew({ event_type: "done", session_id: "new-session", status: "success" }); finishNew(); });
+    expect(screen.getByText("New answer")).toBeInTheDocument();
+    expect(screen.queryByText("Old question")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Send" })).toBeInTheDocument();
   });
 });
