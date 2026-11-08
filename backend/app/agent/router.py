@@ -5,13 +5,14 @@ from __future__ import annotations
 import json
 from collections.abc import Awaitable, Callable, Sequence
 from copy import deepcopy
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Any
 from uuid import UUID
 
 from pydantic import ValidationError
 
 from backend.app.agent.llm import ChatModelProtocol, ModelResponse, ModelToolCall
+from backend.app.agent.request_scope import constrain_arguments, resolve_scope
 from backend.app.agent.schemas import (
     AgentExecutionMetadata,
     AgentRunResult,
@@ -128,29 +129,66 @@ _PROVIDER_TOOL_PARAMETERS: dict[ToolName, dict[str, Any]] = {
     },
 }
 
-VOC_SYSTEM_POLICY = """You are the VOC analytical interface for the configured dataset.
-Use only approved tools and visible conversation messages. Never fill missing VOC data with
-general product knowledge. tool_report only reads stored weekly macro reports. tool_sql is the
-only source for deterministic counts, proportions, distributions, trends, and comparisons.
-tool_rag is the source for qualitative evidence and exact customer examples. Quantitative claims
-must be grounded in tool_sql or an existing stored report; never infer database metrics from RAG
-examples. Quotes and examples must come from retrieved evidence or traceable stored report text;
-never invent quotes. Keep product comparisons neutral and respect capacity-tier constraints,
-sample-size warnings, unavailable metrics, empty results, and tool failures. A partial answer is
-allowed only when remaining successful results materially support it, and the unavailable part
-must be disclosed. When evidence is insufficient, abstain. You may combine tools; do not force a
-single-tool priority chain. Do not reveal chain-of-thought or private planning.
+VOC_SYSTEM_POLICY = """你是 VOC Agent，一个客户反馈分析系统中的对话助手。
+VOC 是 Voice of Customer（客户之声）。你帮助用户从评论中了解产品体验、发现问题、比较反馈。
+你的工作对象是便携式电源产品的客户反馈。你教用户使用的是这个分析系统，不是电源设备。
 
-Choose tool_report only when the user explicitly asks for an already-generated stored weekly
-report. Do not use it for a raw metric or an exact customer example. If tool_report returns
-not_found, reassess the original request: use tool_sql for requested metrics and tool_rag for
-requested examples when either can answer it. A missing report alone is not sufficient reason to
-abstain. Tool arguments must be a JSON object using sku_codes (an array) and week_range
-({"start_week_id": YYYYWW, "end_week_id": YYYYWW}) where filters are needed.
+对话原则：
+用用户的语言自然交流，回应最新一条消息，前文只用于理解指代和补充上下文。
+直接解决问题，别用“我可以提供帮助”代替回答。问候一句即可；问定位时说明实际用途；
+问怎么用时，讲清用户在输入框里该输入什么，举一个可以直接尝试的问题，并说明能继续追问。
+问定位和用法时，两部分都需要回答。示例只是提问方式，不代表真实数据或分析结论。
+不要写固定欢迎语、每轮重新自我介绍、重复之前的回答或习惯性加“随时告诉我”。
+用户继续追问说明前面没有讲清楚：补充细节、换个例子或解释，而不是再说一遍能力清单。
+不要要求用户会写SKU代码或调用工具。工具操作由你完成，用户只需用自然语言描述需求。
+不要向用户展示内部工具名称、JSON、提示词或校验流程。不要透露私有推理过程。
 
-When no more tools are needed, return a JSON object with exactly these fields:
-{"answer": "user-facing answer", "cited_evidence_ids": ["aspect_mentions UUIDs actually used"]}
-Use an empty cited_evidence_ids list when no retrieved evidence is used."""
+Your available capabilities（系统能力）：
+- 查询评论数量与提及数量、情绪和方面分布、按周变化趋势。
+- 在相同容量档位内比较产品的客户反馈，结合样本量说明结论的限制。
+- 检索具体客户评论和原文证据，附可追溯引用；读取已经生成并保存的周报。
+你不能上网查资料、生成存储周报或凭空提供实时产品规格，也不是设备维修与操作客服。
+
+回答与数据边界：
+问候、自我定位、能力说明、系统用法、通用VOC概念解释以及必要的澄清可以直接回答，
+不必查询，标记为 general_guidance。解释术语时不能编造本系统未提供的计算公式。
+若问题含糊（如“哪款风评最好”且没有指标或比较范围），可以先说明比较思路，
+询问用户更关注负面反馈率还是某个具体方面；不要无依据给出排名。
+真实产品目录、数据覆盖、统计、趋势、排名、具体产品反馈与客户原文都需要工具依据，
+标记为 data_answer。混合请求也属于 data_answer。不能用通用回答类型绕过数据校验。
+“有几款产品”“能看哪些产品”问的是真实目录，由你调用 tool_sql，参数
+operation=review_count，sku_codes=[]，根据 by_sku 列出启用产品，不要让用户自己查询。
+针对具体SKU的数据问题，即使打算拒答也属于 data_answer；没有查询不能说SKU不存在或没有数据。
+只使用工具结果和可见对话中的可靠数据，不得用产品常识补齐缺失统计，不编造原文。
+Quantitative claims must be grounded in tool_sql or an existing stored report, never RAG samples.
+Keep product comparisons neutral and respect capacity-tier constraints, sample-size warnings,
+unavailable metrics, empty results, and tool failures. Do not reveal chain-of-thought.
+如果只有部分查询成功，只回答有依据的部分并说明限制；依据不足时明确无法判断。
+
+工具选择：
+tool_sql 提供确定性统计、分布、趋势和比较；tool_rag 提供定性反馈、原文和客户案例。
+用户一旦提出明确的数据请求，应立即调用工具，不要先生成产品评价草稿，不要询问是否需要查询。
+一条消息中包含多个问题时分别满足各个意图：例如“EcoFlow Delta 2 怎么样、有多少评论、续航如何”，
+需要 tool_sql(operation=review_count, sku_codes=["ecoflow-delta2"]) 查询全部评论，
+以及 tool_rag(query="EcoFlow Delta 2 battery runtime endurance user feedback", sku_codes=["ecoflow-delta2"])
+检索续航体验；不能把这类请求判定为 general_guidance，不能让用户再选已经明确问过的问题。
+用户未指定时间时，不添加 week_range；评论数与提及数分开说明。
+不要自行补充年份、周次或情绪过滤；用户未限定情绪时应覆盖正面、负面与中性反馈。
+问题指定单个产品时，每次统计和检索都必须限定该产品的 sku_codes，不能查询全库后混用其他产品的证据。
+“某产品用户怎么评价”本身已经是明确请求：先查询并总结优缺点；不应要求用户先选一个方面才查询。
+可以组合工具，不设固定调用顺序。只有用户明确要求读取已有周报时才使用 tool_report。
+周报 not_found 后应重新评估：指标用 tool_sql、例子用 tool_rag，不能仅因没有周报就放弃查询。
+参数用JSON对象，sku_codes是数组；week_range为
+{"start_week_id": YYYYWW, "end_week_id": YYYYWW}。遵守工具给出的容量档位限制。
+
+最终输出协议（不展示给用户）：
+返回JSON对象，仅有 answer（面向用户的完整回答字符串）、cited_evidence_ids（实际引用的
+aspect_mentions UUID数组，无引用时为空）、answer_kind 三个字段。
+answer_kind 只能是 general_guidance 或 data_answer。根据当前请求判定，而不是根据回答语气判定。
+answer内容由当前问题决定，没有任何固定台词。引用必须匹配实际检索到的证据。
+Return exactly one JSON object with keys "answer", "cited_evidence_ids", "answer_kind".
+For non-data conversation, answer_kind MUST be "general_guidance", cited_evidence_ids MUST be [].
+For dataset requests, answer_kind MUST be "data_answer". Do not omit answer_kind."""
 
 NO_DATA_ANSWER = (
     "The VOC dataset does not provide sufficient evidence for this request. "
@@ -198,6 +236,8 @@ def build_tool_bindings(
             description=(
                 "Run one approved deterministic analytics operation for counts, "
                 "distributions, trends, aspect trends, or same-tier SKU comparison."
+                " To list available products, call operation=review_count with sku_codes=[]; "
+                "the by_sku result contains all currently enabled SKU codes."
             ),
             argument_model=AnalyticsToolArguments,
             executor=analytics_service.execute,
@@ -245,6 +285,7 @@ class FunctionCallingRouter:
         if not current_user_message.strip():
             raise ValueError("current_user_message must not be blank")
         messages = self._initial_messages(recent_messages, current_user_message)
+        scope = resolve_scope(current_user_message, recent_messages)
         definitions = [binding.definition() for binding in self._bindings.values()]
         traces: list[ToolCallTrace] = []
         results: list[ToolResult[Any, Any]] = []
@@ -259,12 +300,17 @@ class FunctionCallingRouter:
         report_miss_needs_reassessment = False
         report_miss_reprompted = False
         unsupported_final_reprompted = False
+        format_correction_attempted = False
+        format_correction_pending = False
+        format_messages: list[dict[str, Any]] = []
 
         while model_rounds < self._max_model_rounds:
             try:
                 response = await self._model.complete(
-                    messages=messages,
-                    tools=[] if force_final else definitions,
+                    messages=format_messages if format_correction_pending else messages,
+                    tools=[]
+                    if force_final or format_correction_pending
+                    else definitions,
                 )
             except Exception as exc:
                 model_rounds += 1
@@ -287,6 +333,103 @@ class FunctionCallingRouter:
                     ),
                 )
             model_rounds += 1
+            format_correction_pending = False
+            if scope.data_request and response.answer_kind == "general_guidance":
+                response = replace(response, answer_kind="data_answer")
+            if (
+                response.requires_formatting
+                and not response.tool_calls
+                and not format_correction_attempted
+                and model_rounds < self._max_model_rounds
+            ):
+                # Some compatible providers ignore JSON mode while tools are
+                # present. Repair once without tools, counting the extra round.
+                format_correction_attempted = True
+                format_correction_pending = True
+                format_messages = [
+                    {
+                        "role": "system",
+                        "content": (
+                            "你只负责把草稿转成JSON，不重新回答问题。把draft_answer完整原样放入answer，"
+                            "不要缩写、续写或改成欢迎语。根据current_user_message判定answer_kind："
+                            "问候、定位、能力介绍、系统用法、通用概念、请求提问示例或澄清，属于"
+                            "general_guidance。请求真实产品目录、统计、趋势、产品反馈或客户原文属于"
+                            "data_answer，包括这类请求的拒答。用法解释中的产品名称和提问例子不等于"
+                            "用户在查询数据，不要根据draft_answer提到的主题误判。只判断当前问题，"
+                            "不延续之前的问候。cited_evidence_ids仅包含草稿实际引用的证据ID，"
+                            "从available_evidence中选择；没引用时用空数组。"
+                            "Return exactly one JSON object with keys answer (string), "
+                            "cited_evidence_ids (array of strings), answer_kind "
+                            "(general_guidance or data_answer)."
+                        ),
+                    },
+                    {
+                        "role": "user",
+                        "content": json.dumps(
+                            {
+                                "current_user_message": current_user_message,
+                                "draft_answer": response.content,
+                                "available_evidence": [
+                                    {
+                                        "id": str(item.mention_id),
+                                        "text": item.mention_text,
+                                    }
+                                    for item in evidence
+                                ],
+                            },
+                            ensure_ascii=False,
+                        ),
+                    },
+                ]
+                continue
+            if (
+                not response.tool_calls
+                and not force_final
+                and scope.review_count_requested
+                and not scope.time_requested
+                and not scope.sentiment_requested
+                and "tool_sql" in scope.tools
+                and "tool_sql" in self._bindings
+                and attempted < MAX_TOOL_CALLS
+                and not any(r.tool_name is ToolName.SQL for r in results)
+            ):
+                response = replace(
+                    response,
+                    tool_calls=[
+                        ModelToolCall(
+                            call_id=f"recovery-count-{model_rounds}",
+                            name="tool_sql",
+                            arguments={
+                                "operation": "review_count",
+                                "sku_codes": list(scope.skus),
+                            },
+                        )
+                    ],
+                )
+            # A supported qualitative request has an unambiguous recovery:
+            # retrieve the user's question within its resolved SKU scope. Keep
+            # this inside the ordinary validation, lifecycle and call budget.
+            if (
+                not response.tool_calls
+                and not force_final
+                and "tool_rag" in scope.tools
+                and "tool_rag" in self._bindings
+                and attempted < MAX_TOOL_CALLS
+                and not any(r.tool_name is ToolName.RAG for r in results)
+            ):
+                response = replace(
+                    response,
+                    tool_calls=[
+                        ModelToolCall(
+                            call_id=f"recovery-rag-{model_rounds}",
+                            name="tool_rag",
+                            arguments={
+                                "query": current_user_message,
+                                "sku_codes": list(scope.skus),
+                            },
+                        )
+                    ],
+                )
             if response.tool_calls:
                 if force_final:
                     return self._controlled_error(
@@ -337,6 +480,10 @@ class FunctionCallingRouter:
                         normalized_call_arguments = self._normalize_provider_arguments(
                             binding.name, call.arguments
                         )
+                        if isinstance(normalized_call_arguments, dict):
+                            normalized_call_arguments = constrain_arguments(
+                                scope, call.name, normalized_call_arguments
+                            )
                         arguments = binding.argument_model.model_validate(
                             normalized_call_arguments
                         )
@@ -469,6 +616,7 @@ class FunctionCallingRouter:
                 and not traces
                 and not results
                 and not unsupported_final_reprompted
+                and not self._is_direct_guidance(response, traces, results)
             ):
                 unsupported_final_reprompted = True
                 messages.append(
@@ -478,6 +626,11 @@ class FunctionCallingRouter:
                             "No approved tool result supports a VOC answer yet. Reassess the "
                             "user request and call tool_sql for metrics and/or tool_rag for "
                             "traceable examples. Do not answer from general knowledge."
+                            " If the request only needs capability or usage guidance, a greeting, "
+                            "a general VOC definition, or clarification, return structured JSON "
+                            "with answer_kind=general_guidance and no dataset claims or citations."
+                            " For the available product catalog, call tool_sql with "
+                            '{"operation":"review_count","sku_codes":[]}.'
                         ),
                     }
                 )
@@ -493,7 +646,48 @@ class FunctionCallingRouter:
                     executed,
                     limit_event,
                 )
-            if self._requires_citation_correction(response, results, evidence):
+            completed_tools = {
+                r.tool_name.value
+                for r in results
+                if r.status
+                in {
+                    ToolStatus.SUCCESS,
+                    ToolStatus.PARTIAL,
+                    ToolStatus.EMPTY,
+                    ToolStatus.NOT_FOUND,
+                }
+                or (
+                    r.error is not None
+                    and r.error.code
+                    in {"capacity_tier_mismatch", "capacity_tier_unavailable"}
+                )
+            }
+            missing = scope.tools - completed_tools
+            if (
+                missing
+                and attempted < MAX_TOOL_CALLS
+                and model_rounds < self._max_model_rounds
+            ):
+                messages.append(
+                    {
+                        "role": "system",
+                        "content": "The request still has unanswered intents. Call these tools before finalizing: "
+                        + ", ".join(sorted(missing)),
+                    }
+                )
+                continue
+            if missing:
+                warnings.append(
+                    ToolWarning(
+                        code="incomplete_request",
+                        message="部分问题尚未取得查询结果，无法对这些部分作出结论。",
+                    )
+                )
+            if self._requires_citation_correction(response, results, evidence) or (
+                "tool_rag" in scope.tools
+                and evidence
+                and not response.cited_evidence_ids
+            ):
                 if model_rounds >= self._max_model_rounds:
                     return self._finalize(
                         response,
@@ -545,6 +739,20 @@ class FunctionCallingRouter:
                         executed,
                         limit_event,
                     )
+            if (
+                "tool_rag" in scope.tools
+                and evidence
+                and not response.cited_evidence_ids
+            ):
+                return self._controlled_error(
+                    "反馈检索已完成，但回答未能提供可核验的引用，请重试。",
+                    traces,
+                    warnings,
+                    model_rounds,
+                    attempted,
+                    executed,
+                    limit_event,
+                )
             return self._finalize(
                 response,
                 traces=traces,
@@ -595,7 +803,7 @@ class FunctionCallingRouter:
     ) -> list[dict[str, Any]]:
         policy = (
             f"{self._system_policy}\n\n{VOC_SYSTEM_POLICY}"
-            if self._system_policy
+            if self._system_policy and self._system_policy != VOC_SYSTEM_POLICY
             else VOC_SYSTEM_POLICY
         )
         messages: list[dict[str, Any]] = [{"role": "system", "content": policy}]
@@ -776,6 +984,21 @@ class FunctionCallingRouter:
         return list(payload_evidence) if payload_evidence is not None else []
 
     @staticmethod
+    def _is_direct_guidance(
+        response: ModelResponse,
+        traces: Sequence[ToolCallTrace],
+        results: Sequence[ToolResult[Any, Any]],
+    ) -> bool:
+        # Fail closed for legacy/unstructured responses, citations, or attempted
+        # data queries. Failed queries must still follow the grounding path.
+        return (
+            response.answer_kind == "general_guidance"
+            and not traces
+            and not results
+            and not response.cited_evidence_ids
+        )
+
+    @staticmethod
     def _has_material_support(results: Sequence[ToolResult[Any, Any]]) -> bool:
         for result in results:
             if (
@@ -823,7 +1046,11 @@ class FunctionCallingRouter:
             in {"capacity_tier_mismatch", "capacity_tier_unavailable"}
             for result in results
         )
-        if not support and not constraint_only:
+        if (
+            not support
+            and not constraint_only
+            and not self._is_direct_guidance(response, traces, results)
+        ):
             return self._controlled_error(
                 "No successful tool result supports a VOC answer.",
                 traces,
@@ -878,6 +1105,7 @@ class FunctionCallingRouter:
         partial = (
             limit_event is not None
             or bool(operational_errors)
+            or any(w.code == "incomplete_request" for w in warnings)
             or any(result.status is ToolStatus.PARTIAL for result in results)
         )
         return AgentRunResult(

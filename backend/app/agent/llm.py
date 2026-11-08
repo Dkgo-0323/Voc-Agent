@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from copy import deepcopy
 from dataclasses import dataclass, field
-from typing import Any, Protocol
+from typing import Any, Literal, Protocol
 
 
 @dataclass(frozen=True)
@@ -20,6 +20,8 @@ class ModelResponse:
     content: str | None = None
     tool_calls: list[ModelToolCall] = field(default_factory=list)
     cited_evidence_ids: list[str] = field(default_factory=list)
+    answer_kind: Literal["data_answer", "general_guidance"] = "data_answer"
+    requires_formatting: bool = False
 
 
 class ChatModelProtocol(Protocol):
@@ -63,7 +65,7 @@ class OpenAIChatCompletionsModel:
         if tools:
             request["tools"] = tools
             request["tool_choice"] = "auto"
-        elif self._final_response_format:
+        if self._final_response_format:
             request["response_format"] = deepcopy(self._final_response_format)
         if self._extra_body:
             request["extra_body"] = self._extra_body
@@ -96,15 +98,24 @@ class OpenAIChatCompletionsModel:
         try:
             parsed = json.loads(content)
         except json.JSONDecodeError:
-            return ModelResponse(content=content)
+            return ModelResponse(content=content, requires_formatting=True)
         if (
             not isinstance(parsed, dict)
-            or set(parsed) != {"answer", "cited_evidence_ids"}
+            or set(parsed)
+            not in (
+                {"answer", "cited_evidence_ids"},
+                {"answer", "cited_evidence_ids", "answer_kind"},
+            )
+            or parsed.get("answer_kind", "data_answer")
+            not in ("data_answer", "general_guidance")
             or not isinstance(parsed.get("answer"), str)
             or not isinstance(parsed.get("cited_evidence_ids"), list)
             or not all(isinstance(item, str) for item in parsed["cited_evidence_ids"])
         ):
-            return ModelResponse(content=content)
+            return ModelResponse(content=content, requires_formatting=True)
         return ModelResponse(
-            content=parsed["answer"], cited_evidence_ids=parsed["cited_evidence_ids"]
+            content=parsed["answer"],
+            cited_evidence_ids=parsed["cited_evidence_ids"],
+            answer_kind=parsed.get("answer_kind", "data_answer"),
+            requires_formatting="answer_kind" not in parsed,
         )

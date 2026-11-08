@@ -313,7 +313,9 @@ async def test_rag_only_returns_only_actually_used_citation() -> None:
 
 
 @pytest.mark.asyncio
-async def test_rag_exact_quote_without_citation_gets_one_json_correction_round() -> None:
+async def test_rag_exact_quote_without_citation_gets_one_json_correction_round() -> (
+    None
+):
     used = evidence_item()
     unused = evidence_item(mention_text="charging is slower than expected")
     executor = RecordingExecutor([rag_result([used, unused])])
@@ -381,7 +383,9 @@ async def test_invalid_citation_correction_remains_a_controlled_failure(
 
 
 @pytest.mark.asyncio
-async def test_rag_answer_without_exact_evidence_does_not_trigger_citation_correction() -> None:
+async def test_rag_answer_without_exact_evidence_does_not_trigger_citation_correction() -> (
+    None
+):
     evidence = evidence_item()
     executor = RecordingExecutor([rag_result([evidence])])
     model = ScriptedModel(
@@ -499,7 +503,9 @@ async def test_report_miss_can_fall_back_to_analytics() -> None:
 
 
 @pytest.mark.asyncio
-async def test_report_miss_reprompts_before_allowing_an_unsupported_final_answer() -> None:
+async def test_report_miss_reprompts_before_allowing_an_unsupported_final_answer() -> (
+    None
+):
     report_executor = RecordingExecutor([report_result(found=False)])
     sql_executor = RecordingExecutor([sql_result()])
     model = ScriptedModel(
@@ -562,7 +568,176 @@ async def test_unsupported_first_round_answer_is_reprompted_for_grounding() -> N
 
 
 @pytest.mark.asyncio
-async def test_provider_argument_aliases_are_normalized_before_strict_validation() -> None:
+@pytest.mark.parametrize(
+    "question,answer",
+    [
+        ("你好", "你好，我可以帮助你分析客户反馈。"),
+        ("你能做什么", "我可以查询反馈数量、分析情绪、比较产品并查找原文例子。"),
+        ("怎么使用", "可以告诉我你关心的产品和时间，以及想看统计还是客户原文。"),
+        ("什么是VOC", "VOC是客户之声，用于了解客户的体验和需求。"),
+        ("帮我比较", "你希望比较哪些产品，关注哪个时间段？"),
+    ],
+)
+async def test_general_guidance_succeeds_without_tool_calls(question, answer) -> None:
+    executor = RecordingExecutor([])
+    model = ScriptedModel(
+        [ModelResponse(content=answer, answer_kind="general_guidance")]
+    )
+    result = await FunctionCallingRouter(
+        model,
+        [binding(ToolName.SQL, AnalyticsToolArguments, executor)],
+        system_policy="",
+    ).run(recent_messages=[], current_user_message=question)
+    assert result.status is AgentStatus.SUCCESS
+    assert result.final_answer == answer
+    assert result.execution.model_round_count == 1
+    assert result.execution.executed_tool_call_count == 0
+    assert executor.calls == []
+    assert "Your available capabilities" in model.calls[0]["messages"][0]["content"]
+
+
+@pytest.mark.asyncio
+async def test_ungrounded_data_answer_is_still_blocked() -> None:
+    model = ScriptedModel([final("There are 12 reviews.")] * 2)
+    result = await run_router(
+        model, [binding(ToolName.SQL, AnalyticsToolArguments, RecordingExecutor([]))]
+    )
+    assert result.status is AgentStatus.ERROR
+    assert "No successful tool result" in result.final_answer
+
+
+@pytest.mark.asyncio
+async def test_guidance_label_does_not_bypass_failed_query() -> None:
+    executor = RecordingExecutor(
+        [
+            sql_result(
+                status=ToolStatus.ERROR,
+                error=ToolError(
+                    code="analytics_query_failed", message="Database unavailable"
+                ),
+            )
+        ]
+    )
+    model = ScriptedModel(
+        [
+            tool_call("sql-1", ToolName.SQL, {"operation": "review_count"}),
+            ModelResponse(
+                content="There are 12 reviews.", answer_kind="general_guidance"
+            ),
+        ]
+    )
+    result = await run_router(
+        model, [binding(ToolName.SQL, AnalyticsToolArguments, executor)]
+    )
+    assert result.status is AgentStatus.ERROR
+
+
+@pytest.mark.asyncio
+async def test_guidance_cannot_cite_unretrieved_evidence() -> None:
+    response = ModelResponse(
+        content="A customer said this.",
+        answer_kind="general_guidance",
+        cited_evidence_ids=[str(uuid4())],
+    )
+    result = await run_router(
+        ScriptedModel([response, response]),
+        [binding(ToolName.SQL, AnalyticsToolArguments, RecordingExecutor([]))],
+    )
+    assert result.status is AgentStatus.ERROR
+
+
+@pytest.mark.asyncio
+async def test_plain_guidance_is_repaired_without_tools() -> None:
+    model = ScriptedModel(
+        [
+            ModelResponse(content="你好", requires_formatting=True),
+            ModelResponse(
+                content="你好，我可以帮助你分析客户反馈。",
+                answer_kind="general_guidance",
+            ),
+        ]
+    )
+    result = await run_router(
+        model,
+        [
+            binding(ToolName.SQL, AnalyticsToolArguments, RecordingExecutor([])),
+        ],
+    )
+    assert result.status is AgentStatus.SUCCESS
+    assert result.execution.model_round_count == 2
+    assert model.calls[0]["tools"]
+    assert model.calls[1]["tools"] == []
+
+
+@pytest.mark.asyncio
+async def test_format_repair_targets_latest_question_in_multiturn_chat() -> None:
+    question = "介绍使用方法和你的定位"
+    model = ScriptedModel(
+        [
+            ModelResponse(
+                content="你好，有什么可以帮助你的？", requires_formatting=True
+            ),
+            ModelResponse(
+                content="我帮助你分析客户反馈。可以直接提出产品和想了解的问题。",
+                answer_kind="general_guidance",
+            ),
+        ]
+    )
+    result = await FunctionCallingRouter(model, [], system_policy="").run(
+        recent_messages=[
+            ConversationMessage(role="user", content="你好"),
+            ConversationMessage(role="assistant", content="你好，有什么可以帮助你的？"),
+        ],
+        current_user_message=question,
+    )
+    assert result.status is AgentStatus.SUCCESS
+    repair = model.calls[1]["messages"]
+    assert len(repair) == 2
+    payload = json.loads(repair[-1]["content"])
+    assert payload["current_user_message"] == question
+    assert payload["draft_answer"] == "你好，有什么可以帮助你的？"
+
+
+@pytest.mark.asyncio
+async def test_format_repair_of_data_request_preserves_query_path() -> None:
+    executor = RecordingExecutor([sql_result()])
+    model = ScriptedModel(
+        [
+            ModelResponse(content="I need to query data.", requires_formatting=True),
+            final("A query is needed."),
+            tool_call("sql-1", ToolName.SQL, {"operation": "review_count"}),
+            final("There are 12 reviews."),
+        ]
+    )
+    result = await run_router(
+        model, [binding(ToolName.SQL, AnalyticsToolArguments, executor)]
+    )
+    assert result.status is AgentStatus.SUCCESS
+    assert result.execution.model_round_count == 4
+    assert model.calls[1]["tools"] == []
+    assert model.calls[2]["tools"]
+    assert len(executor.calls) == 1
+
+
+@pytest.mark.asyncio
+async def test_repeated_plain_answers_cannot_loop_or_bypass_grounding() -> None:
+    model = ScriptedModel(
+        [ModelResponse(content="There are 12 reviews.", requires_formatting=True)] * 3
+    )
+    result = await run_router(
+        model,
+        [
+            binding(ToolName.SQL, AnalyticsToolArguments, RecordingExecutor([])),
+        ],
+    )
+    assert result.status is AgentStatus.ERROR
+    assert result.execution.model_round_count == 3
+
+
+@pytest.mark.asyncio
+async def test_provider_argument_aliases_are_normalized_before_strict_validation() -> (
+    None
+):
     sql_executor = RecordingExecutor([sql_result()])
     rag_executor = RecordingExecutor([rag_result([evidence_item()])])
     model = ScriptedModel(
@@ -587,7 +762,10 @@ async def test_provider_argument_aliases_are_normalized_before_strict_validation
                     "limit": 1,
                 },
             ),
-            final("The supported answer.", [rag_executor.results[0].payload.evidence[0].mention_id]),
+            final(
+                "The supported answer.",
+                [rag_executor.results[0].payload.evidence[0].mention_id],
+            ),
         ]
     )
 
@@ -638,12 +816,12 @@ async def test_provider_argument_normalization_does_not_accept_unknown_fields() 
 
 def test_provider_tool_schemas_are_flat_and_keep_required_contracts() -> None:
     executor = RecordingExecutor([])
-    sql_schema = binding(
-        ToolName.SQL, AnalyticsToolArguments, executor
-    ).definition()["function"]["parameters"]
-    rag_schema = binding(
-        ToolName.RAG, RagToolArguments, executor
-    ).definition()["function"]["parameters"]
+    sql_schema = binding(ToolName.SQL, AnalyticsToolArguments, executor).definition()[
+        "function"
+    ]["parameters"]
+    rag_schema = binding(ToolName.RAG, RagToolArguments, executor).definition()[
+        "function"
+    ]["parameters"]
 
     assert "$defs" not in sql_schema
     assert "anyOf" not in json.dumps(sql_schema)
@@ -793,7 +971,9 @@ async def test_one_tool_failure_and_one_success_produces_disclosed_partial_answe
 
 
 @pytest.mark.asyncio
-async def test_milvus_failure_keeps_supported_analytics_partial_without_citations() -> None:
+async def test_milvus_failure_keeps_supported_analytics_partial_without_citations() -> (
+    None
+):
     rag_error = ToolError(
         code="rag_vector_search_failed",
         message="Semantic evidence search is temporarily unavailable.",
@@ -992,3 +1172,103 @@ async def test_model_provider_failure_returns_controlled_structured_error() -> N
     assert "provider timeout" not in result.error.message
     assert result.execution.model_round_count == 1
     assert result.execution.executed_tool_call_count == 0
+
+
+@pytest.mark.asyncio
+async def test_product_request_cannot_escape_grounding_using_guidance_label():
+    model = ScriptedModel(
+        [ModelResponse(content="续航普遍很好", answer_kind="general_guidance")] * 8
+    )
+    result = await FunctionCallingRouter(
+        model,
+        [binding(ToolName.SQL, AnalyticsToolArguments, RecordingExecutor([]))],
+        system_policy="",
+    ).run(recent_messages=[], current_user_message="EcoFlow Delta 2有多少评论？")
+    assert result.status is AgentStatus.ERROR
+    assert result.execution.executed_tool_call_count == 1
+
+
+@pytest.mark.asyncio
+async def test_scope_is_applied_before_executor_receives_arguments():
+    executor = RecordingExecutor([sql_result()])
+    model = ScriptedModel(
+        [
+            tool_call(
+                "scoped",
+                ToolName.SQL,
+                {
+                    "operation": "review_count",
+                    "sku_codes": ["jackery-explorer-1000"],
+                    "week_range": {"start_week_id": 202313, "end_week_id": 202313},
+                },
+            ),
+            final("有12条评论"),
+        ]
+    )
+    result = await FunctionCallingRouter(
+        model,
+        [binding(ToolName.SQL, AnalyticsToolArguments, executor)],
+        system_policy="",
+    ).run(recent_messages=[], current_user_message="EcoFlow Delta 2有多少评论？")
+    assert result.status is AgentStatus.SUCCESS
+    assert executor.calls[0].sku_codes == ["ecoflow-delta2"]
+    assert executor.calls[0].week_range is None
+
+
+@pytest.mark.asyncio
+async def test_mixed_request_cannot_report_full_success_after_omitting_retrieval():
+    executor = RecordingExecutor([sql_result()])
+    model = ScriptedModel(
+        [tool_call("count", ToolName.SQL, {"operation": "review_count"})]
+        + [final("有12条评论。续航尚无法判断。 ")] * 7
+    )
+    result = await FunctionCallingRouter(
+        model,
+        [binding(ToolName.SQL, AnalyticsToolArguments, executor)],
+        system_policy="",
+    ).run(recent_messages=[], current_user_message="Delta 2有多少评论，续航怎么样？")
+    assert result.status is AgentStatus.PARTIAL
+    assert any(w.code == "incomplete_request" for w in result.warnings)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("repair", [True, False])
+async def test_paraphrased_feedback_needs_verified_citation(repair):
+    evidence = evidence_item()
+    executor = RecordingExecutor([rag_result([evidence])])
+    model = ScriptedModel(
+        [
+            tool_call("rag", ToolName.RAG, {"query": "user feedback"}),
+            final("用户反馈存在噪声问题。"),
+            final("用户反馈存在噪声问题。", [evidence.mention_id] if repair else []),
+        ]
+    )
+    result = await FunctionCallingRouter(
+        model, [binding(ToolName.RAG, RagToolArguments, executor)], system_policy=""
+    ).run(recent_messages=[], current_user_message="Delta 2用户评价怎么样？")
+    assert result.status is (AgentStatus.SUCCESS if repair else AgentStatus.ERROR)
+    assert bool(result.citations) == repair
+
+
+@pytest.mark.asyncio
+async def test_count_recovery_uses_followup_scope_when_model_omits_query():
+    executor = RecordingExecutor([sql_result()])
+    model = ScriptedModel(
+        [
+            ModelResponse(content="请先查询", answer_kind="general_guidance"),
+            final("有12条评论"),
+        ]
+    )
+    result = await FunctionCallingRouter(
+        model,
+        [binding(ToolName.SQL, AnalyticsToolArguments, executor)],
+        system_policy="",
+    ).run(
+        recent_messages=[
+            ConversationMessage(role="user", content="EcoFlow Delta 2用户反馈")
+        ],
+        current_user_message="这些反馈对应多少条去重后的评论？请统计全部时间。",
+    )
+    assert result.status is AgentStatus.SUCCESS
+    assert executor.calls[0].sku_codes == ["ecoflow-delta2"]
+    assert executor.calls[0].operation is AnalyticsOperation.REVIEW_COUNT
