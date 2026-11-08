@@ -67,6 +67,63 @@ class FakeEmbedder:
         return [[0.0] * settings.embedding_dimensions for _ in texts]
 
 
+@pytest.mark.asyncio
+@pytest.mark.parametrize("batch_size,expected_requests", [(1, 3), (2, 2), (10, 1)])
+async def test_enrichment_request_batch_size_preserves_every_document(monkeypatch, batch_size, expected_requests):
+    documents = [make_document() for _ in range(3)]
+    calls = []
+    persisted = []
+
+    class RecordingExtractor(FakeExtractor):
+        async def extract(self, batch):
+            calls.append([document.id for document in batch])
+            return await super().extract(batch)
+
+    async def persist(document_id, mentions):
+        assert len(mentions) == 1
+        assert mentions[0].document_id == document_id
+        persisted.append(document_id)
+
+    monkeypatch.setattr(jobs.settings, "enrichment_batch_size", batch_size)
+    monkeypatch.setattr(jobs, "_persist_enriched_document", persist)
+    stats = jobs.PipelineRunStats()
+    await jobs._run_enrichment_stage(documents, RecordingExtractor(), stats)
+    assert len(calls) == expected_requests
+    assert all(len(batch) <= batch_size for batch in calls)
+    assert sorted(i for batch in calls for i in batch) == sorted(d.id for d in documents)
+    assert sorted(persisted) == sorted(d.id for d in documents)
+    assert stats.documents_enriched == 3
+    assert stats.documents_failed == 0
+
+
+@pytest.mark.asyncio
+async def test_single_review_requests_isolate_provider_failure(monkeypatch):
+    bad, good = make_document(), make_document()
+    persisted, failed = [], []
+
+    class IsolatingExtractor(FakeExtractor):
+        async def extract(self, documents):
+            assert len(documents) == 1
+            if documents[0].id == bad.id:
+                raise RuntimeError("invalid provider response")
+            return await super().extract(documents)
+
+    async def persist(document_id, mentions):
+        persisted.append(document_id)
+
+    async def mark_failed(document_id, error):
+        failed.append(document_id)
+
+    monkeypatch.setattr(jobs.settings, "enrichment_batch_size", 1)
+    monkeypatch.setattr(jobs, "_persist_enriched_document", persist)
+    monkeypatch.setattr(jobs, "_mark_failed", mark_failed)
+    stats = jobs.PipelineRunStats()
+    await jobs._run_enrichment_stage([bad, good], IsolatingExtractor(), stats)
+    assert persisted == [good.id]
+    assert failed == [bad.id]
+    assert stats.documents_failed == stats.documents_enriched == 1
+
+
 class FakeMilvus:
     def __init__(self) -> None:
         self.setup_calls = 0
@@ -262,6 +319,8 @@ async def test_filtered_document_does_not_initialize_llm(monkeypatch) -> None:
 
 @pytest.mark.asyncio
 async def test_invalid_document_isolated_from_valid_batch_peer(monkeypatch) -> None:
+    # This test exercises isolation within a multi-document provider response.
+    monkeypatch.setattr(jobs.settings, "enrichment_batch_size", 10)
     invalid = make_document()
     valid = make_document().model_copy(
         update={"id": uuid4(), "external_id": "worker-review-2"}

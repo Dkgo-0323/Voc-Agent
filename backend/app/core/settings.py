@@ -56,6 +56,8 @@ class Settings(BaseSettings):
     llm_timeout_seconds: float = Field(default=60, gt=0, le=300)
     llm_max_retries: int = Field(default=2, ge=0, le=5)
     llm_extra_body: dict[str, Any] = Field(default_factory=dict)
+    enrichment_batch_size: int = Field(default=10, ge=1, le=10)
+    enrichment_evidence_mode: Literal["text", "spans"] = "text"
     aspect_quality_threshold: float = Field(default=0.55, ge=0, le=1)
     min_reliable_sample: int = Field(default=20, ge=1)
     max_rag_top_k: int = Field(default=20, ge=1, le=100)

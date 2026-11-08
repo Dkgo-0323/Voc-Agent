@@ -18,11 +18,17 @@ from openai import (
 from pydantic import BaseModel, Field, ValidationError
 
 from backend.app.db.repositories.schemas import AspectMentionCreate, DocumentRead
-from pipelines.enrichment.prompts import ASPECT_LABELS, SYSTEM_PROMPT, build_user_prompt
+from pipelines.enrichment.prompts import (
+    ASPECT_LABELS,
+    MAX_MENTION_LENGTH,
+    SPAN_SYSTEM_PROMPT,
+    SYSTEM_PROMPT,
+    build_evidence_spans,
+    build_user_prompt,
+)
 from pipelines.enrichment.quality_scorer import score_quality
 
 MAX_BATCH_SIZE = 10
-MAX_MENTION_LENGTH = 60
 MAX_CONTEXT_LENGTH = 200
 MAX_RETRIES = 2
 logger = logging.getLogger(__name__)
@@ -82,11 +88,33 @@ LABEL_EVIDENCE_PATTERNS = {
         re.I,
     ),
     "home_backup_use": re.compile(
-        r"\bhome\b|\bhouse(?:hold)?\b|\boutage\b|\bblackout\b|"
+        r"\bhome\b|\bhouse(?:hold)?\b|\boutages?\b|\bblackouts?\b|"
         r"\bemergency\s+power\b|\bbackup\s+(?:power|use|for)\b",
         re.I,
     ),
 }
+OUTAGE_EVENT_PATTERN = re.compile(
+    r"\bpower failures?\b|\b(?:power|electricity)\s+(?:went|goes|was|is)\s+out\b|"
+    r"\b(?:power|electricity)\s+came\s+back\s+on\b|"
+    r"\bknock(?:ed|s)?\s+(?:the\s+)?power\s+out\b|"
+    r"\b(?:when|while|during)\s+(?:there\s+(?:was|is)\s+)?no\s+"
+    r"(?:mains\s+)?power\s+(?:was\s+)?available\b",
+    re.I,
+)
+OUTAGE_CONTEXT_PATTERN = re.compile(
+    r"\b(?:cpap|bipap|refrigerator|fridge|freezer|lamps?|lights?|phones?|"
+    r"tablets?|storm|snow|ice|wind|utility|utilities|grid|mains)\b",
+    re.I,
+)
+DEVICE_POWER_FAILURE_PATTERN = re.compile(
+    r"\b(?:my|the|this)\s+(?:jackery|battery|unit|generator|power station)"
+    r"(?:'s)?\s+(?:had\s+(?:a\s+)?)?(?:power\s+failure|power\s+went\s+out)\b|"
+    r"\bpower\s+went\s+out\s+(?:on|in)\s+(?:my|the|this)\s+"
+    r"(?:jackery|battery|unit|generator|power station)\b|"
+    r"\bpower\s+came\s+back\s+on\s+(?:my|the|this)\s+"
+    r"(?:jackery|battery|unit|generator|power station)\b",
+    re.I,
+)
 SCENARIO_LABELS = {"van_rv_use", "camping_outdoor_use", "home_backup_use"}
 SCENARIO_EVIDENCE_PATTERNS = {
     "van_rv_use": re.compile(r"\bvan\b|\brv\b|\bcampervan\b|\bvehicle\b|\bcar\b|\broad trip\b", re.I),
@@ -125,6 +153,11 @@ class RawExtractedDocument(BaseModel):
 
 class ExtractionPayload(BaseModel):
     documents: list[RawExtractedDocument]
+
+
+class FlatExtractionPayload(BaseModel):
+    document_ids: list[UUID]
+    aspects: list[dict[str, Any]]
 
 
 @dataclass(frozen=True)
@@ -168,6 +201,16 @@ def _evidence_rejection_reason(aspect: ExtractedAspect, body: str) -> str | None
     if any(pattern.fullmatch(normalized) for pattern in GENERIC_MENTION_PATTERNS):
         return "mention_text is generic praise or vague usage"
     evidence = _evidence_window(aspect.mention_text, body)
+    if aspect.aspect_label == "home_backup_use":
+        legacy_match = LABEL_EVIDENCE_PATTERNS["home_backup_use"].search(evidence)
+        contextual_outage = (
+            OUTAGE_EVENT_PATTERN.search(evidence)
+            and OUTAGE_CONTEXT_PATTERN.search(evidence)
+            and not DEVICE_POWER_FAILURE_PATTERN.search(evidence)
+        )
+        if not (legacy_match or contextual_outage):
+            return "insufficient explicit evidence for home_backup_use"
+        return None
     required = LABEL_EVIDENCE_PATTERNS.get(aspect.aspect_label)
     if required is not None and required.search(evidence) is None:
         return f"insufficient explicit evidence for {aspect.aspect_label}"
@@ -270,7 +313,10 @@ class AspectExtractor:
         sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
         request_extra_body: dict[str, Any] | None = None,
         fail_fast: bool = False,
+        evidence_mode: str = "text",
     ) -> None:
+        if evidence_mode not in {"text", "spans"}:
+            raise ValueError("evidence_mode must be text or spans")
         self._client = client
         self._model = model
         self._max_tokens = max_tokens
@@ -278,6 +324,7 @@ class AspectExtractor:
         self._sleep = sleep
         self._request_extra_body = dict(request_extra_body or {})
         self._fail_fast = fail_fast
+        self._evidence_mode = evidence_mode
 
     async def extract(self, documents: Sequence[DocumentRead]) -> BatchExtractionResult:
         if len(documents) > MAX_BATCH_SIZE:
@@ -314,6 +361,21 @@ class AspectExtractor:
             {"document_id": str(document.document_id), "body": document.body}
             for document in documents
         ]
+        span_maps = {
+            document.document_id: {
+                span['evidence_id']: span['text']
+                for span in build_evidence_spans(document.body)
+            }
+            for document in documents
+        } if self._evidence_mode == "spans" else {}
+        if span_maps:
+            user_prompt = json.dumps({"documents": [
+                {"document_id": str(d.document_id), "review": d.body,
+                 "evidence_spans": [{"evidence_id": key, "text": text} for key, text in span_maps[d.document_id].items()]}
+                for d in documents
+            ]}, ensure_ascii=False)
+        else:
+            user_prompt = build_user_prompt(request_documents)
         last_error: Exception | None = None
         for attempt in range(MAX_RETRIES + 1):
             try:
@@ -323,10 +385,10 @@ class AspectExtractor:
                     "max_tokens": self._max_tokens,
                     "response_format": {"type": "json_object"},
                     "messages": [
-                        {"role": "system", "content": SYSTEM_PROMPT},
+                        {"role": "system", "content": SPAN_SYSTEM_PROMPT if span_maps else SYSTEM_PROMPT},
                         {
                             "role": "user",
-                            "content": build_user_prompt(request_documents),
+                            "content": user_prompt,
                         },
                     ],
                 }
@@ -339,6 +401,8 @@ class AspectExtractor:
                 decoded = json.loads(content)
                 if not isinstance(decoded, dict):
                     raise ExtractionResponseError("LLM response must be a JSON object")
+                if span_maps:
+                    decoded = self._resolve_evidence_ids(decoded, span_maps)
                 try:
                     return self._validate_payload(decoded, documents)
                 except ExtractionResponseError as error:
@@ -357,7 +421,8 @@ class AspectExtractor:
             ) as error:
                 if self._fail_fast:
                     raise ExtractionResponseError(
-                        "Extraction failed; retries and single-document fallback disabled"
+                        "Extraction failed; retries and single-document fallback disabled: "
+                        f"{type(error).__name__}: {error}"
                     ) from error
                 last_error = error
             if attempt < MAX_RETRIES:
@@ -383,7 +448,8 @@ class AspectExtractor:
             else None
         )
         raise ExtractionResponseError(
-            "Invalid LLM response after retries", raw_response=raw_response
+            f"Invalid LLM response after retries: {type(last_error).__name__}: {last_error}",
+            raw_response=raw_response,
         ) from last_error
 
     async def _request_documents_individually(
@@ -420,10 +486,52 @@ class AspectExtractor:
         return valid_documents, failed_document_errors
 
     @staticmethod
+    def _resolve_evidence_ids(payload, span_maps):
+        if not isinstance(payload.get("aspects"), list):
+            raise ExtractionResponseError("Missing evidence-ID aspects array")
+        resolved = []
+        for raw in payload["aspects"]:
+            if not isinstance(raw, dict):
+                raise ExtractionResponseError("Invalid evidence-ID aspect")
+            try:
+                document_id = UUID(str(raw["document_id"]))
+                quote = span_maps[document_id][raw["evidence_id"]]
+            except (KeyError, ValueError, TypeError) as error:
+                raise ExtractionResponseError("Unknown document or evidence ID") from error
+            if "mention_text" in raw and raw["mention_text"] != quote:
+                raise ExtractionResponseError("Evidence ID conflicts with supplied quote")
+            item = {key: value for key, value in raw.items() if key != "evidence_id"}
+            item.update(mention_text=quote, context_window=None)
+            resolved.append(item)
+        return {**payload, "aspects": resolved}
+
+    @staticmethod
     def _validate_payload(
         payload: dict[str, Any], prepared: Sequence[PreparedDocument]
     ) -> tuple[list[ExtractedDocument], dict[UUID, str]]:
         prepared_by_id = {document.document_id: document.body for document in prepared}
+        if "document_ids" in payload:
+            if "documents" in payload:
+                raise ExtractionResponseError("LLM returned mixed extraction formats")
+            try:
+                flat = FlatExtractionPayload.model_validate(payload)
+            except ValidationError as error:
+                raise ExtractionResponseError("LLM response does not match flat extraction schema") from error
+            if len(set(flat.document_ids)) != len(flat.document_ids):
+                raise ExtractionResponseError("LLM returned a duplicate document ID")
+            if set(flat.document_ids) != set(prepared_by_id):
+                raise ExtractionResponseError("LLM returned unknown or missing document IDs")
+            grouped: dict[UUID, list[dict[str, Any]]] = {key: [] for key in flat.document_ids}
+            for raw_aspect in flat.aspects:
+                aspect = raw_aspect.copy()
+                try:
+                    document_id = UUID(str(aspect.pop("document_id")))
+                except (KeyError, ValueError, TypeError) as error:
+                    raise ExtractionResponseError("LLM aspect has an invalid or missing document ID") from error
+                if document_id not in grouped:
+                    raise ExtractionResponseError("LLM aspect references an unknown document ID")
+                grouped[document_id].append(aspect)
+            payload = {"documents": [{"document_id": key, "aspects": aspects} for key, aspects in grouped.items()]}
         try:
             parsed = ExtractionPayload.model_validate(payload)
         except ValidationError as error:
@@ -490,7 +598,7 @@ class AspectExtractor:
                     )
                     continue
                 aspect.mention_text = exact_mention
-                if context_was_too_long:
+                if context_was_too_long or aspect.context_window is None:
                     aspect.context_window = _evidence_window(exact_mention, body)
                 evidence_reason = _evidence_rejection_reason(aspect, body)
                 if evidence_reason is not None:

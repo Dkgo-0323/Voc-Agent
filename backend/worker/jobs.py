@@ -119,6 +119,7 @@ def build_aspect_extractor(
         model=settings.llm_model,
         max_tokens=settings.llm_max_tokens,
         request_extra_body=settings.llm_extra_body,
+        evidence_mode=settings.enrichment_evidence_mode,
     )
 
 
@@ -226,7 +227,10 @@ async def _run_enrichment_stage(
 
     semaphore = asyncio.Semaphore(MAX_EXTRACTION_CONCURRENCY)
     results = await asyncio.gather(
-        *(_extract_batch(extractor, batch, semaphore) for batch in _batches(eligible))
+        *(
+            _extract_batch(extractor, batch, semaphore)
+            for batch in _batches(eligible, settings.enrichment_batch_size)
+        )
     )
     for batch, result in results:
         if isinstance(result, BaseException):

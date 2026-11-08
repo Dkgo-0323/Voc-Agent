@@ -18,7 +18,215 @@ from pipelines.enrichment.aspect_extractor import (
     detect_english,
     prepare_document,
 )
-from pipelines.enrichment.prompts import SYSTEM_PROMPT
+from pipelines.enrichment.prompts import (
+    SYSTEM_PROMPT,
+    build_evidence_spans,
+    build_user_prompt,
+)
+
+
+def test_numbered_spans_preserve_literal_offsets_and_whitespace():
+    body = 'The  fan is quiet. It ran  12 hours; compact and easy to carry.<br />' + 'x' * 140
+    spans = build_evidence_spans(body)
+    assert len({s['evidence_id'] for s in spans}) == len(spans)
+    assert all(body[s['start']:s['end']] == s['text'] for s in spans)
+    assert all(0 < len(s['text']) <= 120 for s in spans)
+    assert any('The  fan' in s['text'] for s in spans)
+    assert any('ran  12' in s['text'] for s in spans)
+
+
+@pytest.mark.parametrize('case', ['unknown_span', 'unknown_document', 'conflicting_quote'])
+def test_evidence_id_mode_rejects_untrusted_provenance(case):
+    document_id = uuid4()
+    aspect = {'document_id': str(document_id), 'evidence_id': 'e0'}
+    if case == 'unknown_span':
+        aspect['evidence_id'] = 'invented'
+    elif case == 'unknown_document':
+        aspect['document_id'] = str(uuid4())
+    else:
+        aspect['mention_text'] = 'a paraphrase'
+    with pytest.raises(ExtractionResponseError):
+        AspectExtractor._resolve_evidence_ids({'document_ids': [str(document_id)], 'aspects': [aspect]}, {document_id: {'e0': 'The fan is quiet.'}})
+
+
+@pytest.mark.asyncio
+async def test_evidence_id_mode_keeps_multiple_distinct_aspects_and_exact_spaces():
+    document = make_document('The  fan is quiet. The case is light weight. Battery ran for 12 hours.')
+    spans = build_evidence_spans(document.body)
+    labels = ['noise_level', 'weight_portability', 'battery_capacity']
+    response = {'document_ids': [str(document.id)], 'aspects': [{
+        'document_id': str(document.id), 'evidence_id': span['evidence_id'],
+        'aspect_label': label, 'sentiment': 'neutral', 'confidence': 0.9,
+    } for span, label in zip(spans, labels, strict=True)]}
+    client = FakeClient(json.dumps(response))
+    result = await AspectExtractor(client, language_detector=lambda _: True, fail_fast=True, evidence_mode='spans').extract([document])
+    assert len(result.documents[0].aspects) == 3
+    assert result.documents[0].aspects[0].mention_text == 'The  fan is quiet.'
+    assert [a.aspect_label for a in result.documents[0].aspects] == labels
+    assert client.chat.completions.calls == 1
+
+
+@pytest.mark.asyncio
+async def test_unknown_span_does_not_trigger_retry_in_fail_fast_mode():
+    document = make_document('The battery lasted all night powering the refrigerator.')
+    client = FakeClient(json.dumps({'document_ids': [str(document.id)], 'aspects': [{
+        'document_id': str(document.id), 'evidence_id': 'made-up',
+        'aspect_label': 'battery_capacity', 'sentiment': 'positive', 'confidence': 0.9,
+    }]}))
+    with pytest.raises(ExtractionResponseError):
+        await AspectExtractor(client, language_detector=lambda _: True, fail_fast=True, evidence_mode='spans').extract([document])
+    assert client.chat.completions.calls == 1
+
+
+def test_batch_prompt_supplies_parseable_skeleton_with_all_document_ids() -> None:
+    documents = [{"document_id": str(uuid4()), "body": "Review with {braces} and quotes."} for _ in range(5)]
+    prompt = build_user_prompt(documents)
+    skeleton = json.loads(prompt.splitlines()[-1])
+    assert skeleton["document_ids"] == [item["document_id"] for item in documents]
+    assert skeleton["aspects"] == []
+
+
+def test_flat_output_preserves_empty_documents_and_applies_evidence_checks() -> None:
+    a = PreparedDocument(document_id=uuid4(), body="The fan is extremely loud at night.")
+    b = PreparedDocument(document_id=uuid4(), body="I have no specific feedback about the battery.")
+    documents, failures = AspectExtractor._validate_payload({"document_ids": [str(a.document_id), str(b.document_id)], "aspects": [{"document_id": str(a.document_id), "aspect_label": "noise_level", "sentiment": "negative", "confidence": 0.9, "mention_text": "fan is extremely loud"}, {"document_id": str(b.document_id), "aspect_label": "battery_capacity", "sentiment": "positive", "confidence": 0.9, "mention_text": "battery lasted all night"}]}, [a, b])
+    assert len(documents[0].aspects) == 1
+    assert documents[1].aspects == []
+    assert b.document_id in failures
+
+
+@pytest.mark.parametrize("case", ["missing", "duplicate", "unknown", "aspect_unknown", "aspect_missing", "mixed"])
+def test_flat_output_rejects_ambiguous_document_mapping(case) -> None:
+    document = PreparedDocument(document_id=uuid4(), body="The fan is extremely loud at night.")
+    payload = {"document_ids": [str(document.document_id)], "aspects": []}
+    if case == "missing":
+        payload["document_ids"] = []
+    elif case == "duplicate":
+        payload["document_ids"] *= 2
+    elif case == "unknown":
+        payload["document_ids"] = [str(uuid4())]
+    elif case == "aspect_unknown":
+        payload["aspects"] = [{"document_id": str(uuid4())}]
+    elif case == "aspect_missing":
+        payload["aspects"] = [{}]
+    else:
+        payload["documents"] = []
+    with pytest.raises(ExtractionResponseError):
+        AspectExtractor._validate_payload(payload, [document])
+
+
+@pytest.mark.asyncio
+async def test_missing_array_closure_is_rejected_without_retry_and_keeps_diagnosis() -> None:
+    documents = [make_document("The fan is extremely loud at night.") for _ in range(2)]
+    content = json.dumps({"documents": [{"document_id": str(d.id), "aspects": [{"aspect_label": "noise_level", "sentiment": "negative", "confidence": 0.9, "mention_text": "fan is extremely loud"}]} for d in documents]}, separators=(",", ":"))
+    # Reproduce the live provider's missing ] at the document boundary.
+    content = content.replace('"}]},{"document_id"', '"}},{"document_id"', 1)
+    client = FakeClient(content)
+    extractor = AspectExtractor(client, language_detector=lambda _: True, fail_fast=True)
+    with pytest.raises(ExtractionResponseError, match="JSONDecodeError") as caught:
+        await extractor.extract(documents)
+    assert isinstance(caught.value.__cause__, json.JSONDecodeError)
+    assert client.chat.completions.calls == 1
+
+
+def test_null_context_is_rebuilt_from_original_review_before_scoring() -> None:
+    document = make_document("During camping the fan is extremely loud at night.")
+    prepared = PreparedDocument(document_id=document.id, body=document.body)
+    extracted, failures = AspectExtractor._validate_payload({"documents": [{"document_id": str(document.id), "aspects": [{"aspect_label": "noise_level", "sentiment": "negative", "confidence": 0.9, "mention_text": "fan is extremely loud", "context_window": None}]}]}, [prepared])
+    assert not failures
+    aspect = extracted[0].aspects[0]
+    assert aspect.context_window in document.body
+    assert aspect.mention_text in aspect.context_window
+    assert len(aspect.context_window) <= 200
+    mentions = build_aspect_mentions([document], SimpleNamespace(documents=extracted))
+    assert 0 <= mentions[0].quality_score <= 1
+
+
+@pytest.mark.parametrize("length", [59, 60, 61, 119, 120, 121])
+def test_excerpt_length_boundary_keeps_exact_original(length) -> None:
+    prefix = "The battery did not last through the night "
+    mention = prefix + "x" * (length - len(prefix))
+    document = make_document(mention)
+    extracted, failures = AspectExtractor._validate_payload(
+        {"document_ids": [str(document.id)], "aspects": [{
+            "document_id": str(document.id), "aspect_label": "battery_capacity",
+            "sentiment": "negative", "confidence": 0.9,
+            "mention_text": mention, "context_window": None,
+        }]},
+        [PreparedDocument(document_id=document.id, body=document.body)],
+    )
+    if length <= 120:
+        assert not failures
+        assert extracted[0].aspects[0].mention_text == mention
+        mentions = build_aspect_mentions([document], SimpleNamespace(documents=extracted))
+        assert "did not" in mentions[0].mention_text
+        assert 0 <= mentions[0].quality_score <= 1
+    else:
+        assert document.id in failures
+        assert extracted[0].aspects == []
+
+
+def test_long_paraphrase_is_still_rejected() -> None:
+    body = "The battery did not last through the night while powering my refrigerator."
+    document = make_document(body)
+    extracted, failures = AspectExtractor._validate_payload(
+        {"document_ids": [str(document.id)], "aspects": [{
+            "document_id": str(document.id), "aspect_label": "battery_capacity",
+            "sentiment": "positive", "confidence": 0.9,
+            "mention_text": body.replace("did not", "did"),
+        }]}, [PreparedDocument(document_id=document.id, body=body)],
+    )
+    assert document.id in failures
+    assert extracted[0].aspects == []
+
+
+def test_emergency_use_alone_still_cannot_establish_home_backup() -> None:
+    document = make_document("Works as advertised. For emergency use.")
+    extracted, failures = AspectExtractor._validate_payload(
+        {"document_ids": [str(document.id)], "aspects": [{
+            "document_id": str(document.id), "aspect_label": "home_backup_use",
+            "sentiment": "neutral", "confidence": 0.9,
+            "mention_text": "For emergency use.",
+        }]}, [PreparedDocument(document_id=document.id, body=document.body)],
+    )
+    assert document.id in failures
+    assert extracted[0].aspects == []
+
+
+def test_prompt_and_validator_share_120_character_limit() -> None:
+    from pipelines.enrichment.aspect_extractor import MAX_MENTION_LENGTH
+
+    assert MAX_MENTION_LENGTH == 120
+    assert f"no more than {MAX_MENTION_LENGTH} characters" in SYSTEM_PROMPT
+
+
+@pytest.mark.parametrize("body,mention,accepted", [
+    ("During a power failure our CPAP kept running all night.", "our CPAP kept running all night", True),
+    ("The power went out and this kept our refrigerator running.", "kept our refrigerator running", True),
+    ("Our electricity went out but the lamp stayed on all evening.", "the lamp stayed on all evening", True),
+    ("Phone and tablet have been fully charged when no power available.", "Phone and tablet have been fully charged", True),
+    ("Wind knocked the power out but our phones stayed charged.", "our phones stayed charged", True),
+    ("We use this for power outages and keep our lamps on.", "keep our lamps on", True),
+    ("During blackouts it kept the refrigerator running.", "kept the refrigerator running", True),
+    ("It powered the lamp all evening. Then the power came back on this afternoon.", "powered the lamp all evening", True),
+    ("The power came back on my unit while it was charging a phone.", "charging a phone", False),
+    ("I plan to use it for emergency use with my phone.", "emergency use with my phone", False),
+    ("The unit has no power available for my phone.", "no power available for my phone", False),
+    ("My Jackery had a power failure while charging my phone.", "power failure while charging my phone", False),
+    ("The power went out on my unit while running a CPAP.", "running a CPAP", False),
+    ("Power failure is printed on the display.", "Power failure", False),
+    ("I charge my phone and tablet every night with this unit.", "charge my phone and tablet", False),
+])
+def test_contextual_outage_evidence_distinguishes_grid_loss_from_device_failure(body, mention, accepted) -> None:
+    document = PreparedDocument(document_id=uuid4(), body=body)
+    extracted, failures = AspectExtractor._validate_payload(
+        {"document_ids": [str(document.document_id)], "aspects": [{
+            "document_id": str(document.document_id), "aspect_label": "home_backup_use",
+            "sentiment": "neutral", "confidence": 0.9, "mention_text": mention,
+        }]}, [document],
+    )
+    assert bool(extracted[0].aspects) is accepted
+    assert bool(failures) is not accepted
 
 
 def make_document(body: str) -> DocumentRead:
